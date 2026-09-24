@@ -1,0 +1,154 @@
+<!doctype html>
+<!--
+  Pré-visualização local do dashboard, sem ESP.
+  Simula o stream SSE /events do ESPHome com valores aleatórios.
+
+  npx http-server . -p 8080   →   http://localhost:8080/dev/preview.html
+  Cenários: ?s=dia (defeito) | ?s=noite | ?s=venda
+  Só os 4 sensores essenciais: &min=1
+  Estado/ligação: &estado=Alarme  &modbus=0
+  Testar com o UI real do ESPHome: ?ui=https://oi.esphome.io/v3/www.js
+-->
+<html lang="pt-PT">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Deye Dashboard · pré-visualização</title>
+    <link rel="stylesheet" href="../deye-dashboard.css" />
+  </head>
+  <body>
+    <esp-app></esp-app>
+    <script>
+      (function () {
+        var q = new URLSearchParams(location.search);
+        var scenario = q.get("s") || "dia";
+        var S = {
+          dia: { load: 900, pv: 2600, soc: 64 },
+          noite: { load: 650, pv: 0, soc: 17 },
+          venda: { load: 450, pv: 4100, soc: 100 },
+        }[scenario];
+        var minimal = q.get("min") === "1";
+        // [nome no YAML, unidade, domínio]
+        var names = {
+          pv: ["Produção PV1", "W"],
+          pv2: ["Produção PV2", "W"],
+          soc: ["Nível da Bateria", "%"],
+          bat: ["Potência da Bateria", "W"],
+          grid: ["Potência da Rede", "W"],
+          load: ["Consumo da Casa", "W"],
+          ePv: ["Produção Solar Hoje", "kWh"],
+          eLoad: ["Consumo Hoje", "kWh"],
+          eBuy: ["Energia Comprada Hoje", "kWh"],
+          eSell: ["Energia Vendida Hoje", "kWh"],
+          eChg: ["Carga da Bateria Hoje", "kWh"],
+          eDis: ["Descarga da Bateria Hoje", "kWh"],
+          vGrid: ["Tensão da Rede", "V"],
+          fGrid: ["Frequência da Rede", "Hz"],
+          vBat: ["Tensão da Bateria", "V"],
+          tBat: ["Temperatura da Bateria", "°C"],
+          tDc: ["Temperatura DC do Inversor", "°C"],
+          tAc: ["Temperatura AC do Inversor", "°C"],
+          vPv1: ["Tensão PV1", "V"],
+          vPv2: ["Tensão PV2", "V"],
+          state: ["Estado do Inversor", "", "text_sensor"],
+          link: ["Ligação ao Inversor", "", "binary_sensor"],
+        };
+        var essential = { pv: 1, soc: 1, bat: 1, grid: 1 };
+        var E = { pv: 9.4, load: 6.2, buy: 1.1, sell: 2.3, chg: 3.4, dis: 0.8 };
+        var rnd = function (a, b) { return a + Math.random() * (b - a); };
+        var clamp = function (v, a, b) { return Math.max(a, Math.min(b, v)); };
+        var r1 = function (v) { return Math.round(v * 10) / 10; };
+
+        function step() {
+          S.load = clamp(S.load + rnd(-200, 200), 250, 3200);
+          if (scenario !== "noite") S.pv = clamp(S.pv + rnd(-250, 250), 0, 5200);
+          var net = S.pv - S.load;
+          var bat = 0; // + descarga
+          if (net > 0 && S.soc < 100) bat = -Math.min(net, 3000);
+          else if (net < 0 && S.soc > 10) bat = Math.min(-net, 3000);
+          S.soc = clamp(S.soc - (bat / 3000) * 0.6, 0, 100);
+          var grid = S.load - S.pv - bat; // + compra
+          var h = 0.05; // cada passo simula 3 min de energia
+          E.pv += (S.pv / 1000) * h;
+          E.load += (S.load / 1000) * h;
+          if (grid > 0) E.buy += (grid / 1000) * h;
+          else E.sell += (-grid / 1000) * h;
+          if (bat < 0) E.chg += (-bat / 1000) * h;
+          else E.dis += (bat / 1000) * h;
+          var pv1 = Math.round(S.pv * 0.56);
+          return {
+            pv: pv1,
+            pv2: Math.round(S.pv) - pv1,
+            soc: Math.round(S.soc),
+            bat: Math.round(bat),
+            grid: Math.round(grid),
+            load: Math.round(S.load),
+            ePv: r1(E.pv),
+            eLoad: r1(E.load),
+            eBuy: r1(E.buy),
+            eSell: r1(E.sell),
+            eChg: r1(E.chg),
+            eDis: r1(E.dis),
+            vGrid: r1(rnd(229, 234)),
+            fGrid: Math.round(rnd(49.97, 50.03) * 100) / 100,
+            vBat: Math.round((50.5 + S.soc * 0.03) * 100) / 100,
+            tBat: r1(rnd(23, 25)),
+            tDc: r1(rnd(41, 44)),
+            tAc: r1(rnd(36, 38)),
+            vPv1: S.pv > 0 ? Math.round(rnd(300, 330)) : 0,
+            vPv2: S.pv > 0 ? Math.round(rnd(280, 310)) : 0,
+            state: q.get("estado") || "Normal",
+            link: q.get("modbus") !== "0",
+          };
+        }
+
+        function FakeEventSource(url) {
+          var es = new EventTarget();
+          es.url = url;
+          es.readyState = 0;
+          es.close = function () {};
+          function emit(type, obj) {
+            es.dispatchEvent(new MessageEvent(type, { data: obj == null ? "" : JSON.stringify(obj) }));
+          }
+          function states(all) {
+            var v = step();
+            Object.keys(v).forEach(function (k) {
+              if (minimal && !essential[k]) return;
+              var dom = names[k][2] || "sensor";
+              var d = { id: dom + "/" + names[k][0], value: v[k], state: dom === "binary_sensor" ? (v[k] ? "ON" : "OFF") : (v[k] + " " + names[k][1]).trim() };
+              if (all) {
+                d.domain = dom;
+                d.name = names[k][0];
+                d.icon = "";
+                d.entity_category = 0;
+                d.sorting_group = "";
+                d.sorting_weight = 1;
+                d.uom = names[k][1];
+              }
+              emit("state", d);
+            });
+          }
+          setTimeout(function () {
+            es.readyState = 1;
+            es.dispatchEvent(new Event("open"));
+            emit("ping", { title: "Deye Inverter", comment: "", ota: true, log: false, lang: "pt", uptime: 1234 });
+            emit("sorting_group", { name: "Solar", sorting_weight: 0 });
+            states(true);
+            var n = 0;
+            (function loop() {
+              states(false);
+              setTimeout(loop, ++n < 40 ? 300 : 3000);
+            })();
+            setInterval(function () { emit("ping", { uptime: 1234 }); }, 10000);
+          }, 200);
+          return es;
+        }
+        window.EventSource = FakeEventSource;
+
+        var ui = q.get("ui");
+        window.DEYE_DASH = ui ? { esphomeUiUrl: ui } : { loadEsphomeUi: false };
+      })();
+    </script>
+    <script src="../deye-dashboard.js"></script>
+  </body>
+</html>
