@@ -7,6 +7,7 @@
   Cenários: ?s=dia (defeito) | ?s=noite | ?s=venda
   Só os 4 sensores essenciais: &min=1
   Estado/ligação: &estado=Alarme  &modbus=0
+  Inversor sem leituras (sensores "NA"): &min=1&na=1
   Testar com o UI real do ESPHome: ?ui=https://oi.esphome.io/v3/www.js
 -->
 <html lang="pt-PT">
@@ -28,6 +29,7 @@
           venda: { load: 450, pv: 4100, soc: 100 },
         }[scenario];
         var minimal = q.get("min") === "1";
+        var noModbus = q.get("na") === "1"; // sensores sem leitura: value null, state "NA"
         // [nome no YAML, unidade, domínio]
         var names = {
           pv: ["Produção PV1", "W"],
@@ -114,8 +116,9 @@
             var v = step();
             Object.keys(v).forEach(function (k) {
               if (minimal && !essential[k]) return;
+              if (noModbus && k !== "link") v[k] = null;
               var dom = names[k][2] || "sensor";
-              var d = { id: dom + "/" + names[k][0], value: v[k], state: dom === "binary_sensor" ? (v[k] ? "ON" : "OFF") : (v[k] + " " + names[k][1]).trim() };
+              var d = { id: dom + "/" + names[k][0], value: v[k], state: dom === "binary_sensor" ? (v[k] ? "ON" : "OFF") : v[k] == null ? "NA" : (v[k] + " " + names[k][1]).trim() };
               if (all) {
                 d.domain = dom;
                 d.name = names[k][0];

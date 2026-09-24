@@ -77,7 +77,8 @@
   var dirty = {};
   var hist = { pv: [], soc: [], grid: [], load: [] };
   var peak = null;
-  var lastState = 0;
+  var lastState = 0; // última leitura válida do inversor
+  var seenState = false; // já chegaram estados, mesmo que vazios
   var lastEvent = 0;
   var connected = false;
   var keyByName = {};
@@ -508,8 +509,9 @@
       s = "stale";
       txt = "Inversor sem resposta";
     } else if (!lastState) {
-      s = "connecting";
-      txt = "A aguardar dados…";
+      // Sensores a chegar sem valor ("NA"): o ESP está ligado mas o Modbus não responde
+      s = seenState ? "stale" : "connecting";
+      txt = seenState ? "Sem leituras do inversor" : "A aguardar dados…";
     } else if (now - lastState > 180000) {
       s = "stale";
       txt = "Sem leituras novas · " + ago(now - lastState);
@@ -677,7 +679,8 @@
     if (!k) return;
     val[k] = parseValue(d.value);
     dirty[k] = true;
-    lastState = lastEvent;
+    seenState = true;
+    if (val[k] != null && k !== "link") lastState = lastEvent;
     if (!commitTimer) commitTimer = setTimeout(commit, 250);
   }
 

@@ -1,4 +1,7 @@
-# Deye SUN-6K-SG05LP1  →  RS485 (M5Stack, SP485EEN)  →  ESP32  →  ESPHome web_server v3 + dashboard
+# Deye SUN-6K-SG05LP1  →  RS485 (M5Stack, SP485EEN)  →  ESP8266 (ESP-12)  →  ESPHome web_server v3 + dashboard
+#
+# Variante ESP8266 de deye-inverter.yaml (mesmos sensores e nomes). O Modbus ocupa a UART0
+# (GPIO1/GPIO3), por isso não há logs por cabo: vê-os pelo WiFi no painel ESPHome ou com `esphome logs`.
 #
 # Mapa de registos: Deye Modbus protocol V118, híbrido monofásico SG0*LP1
 # (o mesmo usado pelo ha-solarman em deye_hybrid.yaml).
@@ -17,13 +20,13 @@ esphome:
   name: ${name}
   friendly_name: ${friendly_name}
 
-esp32:
-  board: esp32dev
-  framework:
-    type: esp-idf
+esp8266:
+  board: esp12e
 
-# O Modbus usa a UART2 (GPIO16/17): a UART0/USB fica livre para logs.
+# baud_rate 0 liberta a UART0 para o Modbus; os logs continuam disponíveis pelo WiFi.
+# INFO mostra os avisos do Modbus (sem resposta, CRC). Para mais detalhe, usa DEBUG temporariamente.
 logger:
+  baud_rate: 0
   level: INFO
 
 api:
@@ -78,8 +81,8 @@ web_server:
 
 uart:
   id: uart_bus
-  tx_pin: GPIO17 # → DI do módulo RS485
-  rx_pin: GPIO16 # ← RO do módulo RS485
+  tx_pin: GPIO1 # fio branco → DI do módulo RS485
+  rx_pin: GPIO3 # fio amarelo ← RO do módulo RS485
   baud_rate: 9600
   stop_bits: 1
 
