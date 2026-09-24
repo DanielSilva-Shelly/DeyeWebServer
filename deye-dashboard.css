@@ -1,0 +1,553 @@
+/*!
+ * Deye Dashboard — tema para o ESPHome web_server v3
+ * https://github.com/DanielSilva-Shelly/DeyeWebServer
+ *
+ * Carregado via `css_url`. Estiliza o dashboard criado por deye-dashboard.js
+ * (light DOM). O UI original do ESPHome vive em Shadow DOM e só herda
+ * cor de fundo, esquema claro/escuro e --primary-color.
+ */
+
+/* ---------- Tokens ------------------------------------------------------ */
+/* light-dark() segue o `color-scheme` do <html>: sistema operativo por
+   defeito, ou o botão claro/escuro do painel ESPHome quando é usado. */
+:root {
+  color-scheme: light dark;
+
+  --dd-page: light-dark(#f9f9f7, #0d0d0d);
+  --dd-surface: light-dark(#fcfcfb, #1a1a19);
+  --dd-ink: light-dark(#0b0b0b, #ffffff);
+  --dd-ink-2: light-dark(#52514e, #c3c2b7);
+  --dd-muted: #898781;
+  --dd-hair: light-dark(#e1e0d9, #2c2c2a);
+  --dd-axis: light-dark(#c3c2b7, #383835);
+  --dd-border: light-dark(rgba(11, 11, 11, 0.1), rgba(255, 255, 255, 0.1));
+
+  /* Identidade por fonte de energia (validado para daltonismo, 3 tons) */
+  --dd-solar: light-dark(#eb6834, #d95926);
+  --dd-bat: light-dark(#1baf7a, #199e70);
+  --dd-grid: light-dark(#2a78d6, #3987e5);
+  --dd-home: var(--dd-ink-2);
+
+  /* Estado (reservado: nunca usado como cor de série) */
+  --dd-good: #0ca30c;
+  --dd-warn: #fab219;
+  --dd-crit: #d03b3b;
+
+  /* Painel ESPHome original */
+  --primary-color: var(--dd-grid);
+}
+
+/* Browsers sem light-dark() (anteriores a 2024): segue só o sistema. */
+@supports not (color: light-dark(#000, #fff)) {
+  :root {
+    --dd-page: #f9f9f7;
+    --dd-surface: #fcfcfb;
+    --dd-ink: #0b0b0b;
+    --dd-ink-2: #52514e;
+    --dd-hair: #e1e0d9;
+    --dd-axis: #c3c2b7;
+    --dd-border: rgba(11, 11, 11, 0.1);
+    --dd-solar: #eb6834;
+    --dd-bat: #1baf7a;
+    --dd-grid: #2a78d6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --dd-page: #0d0d0d;
+      --dd-surface: #1a1a19;
+      --dd-ink: #ffffff;
+      --dd-ink-2: #c3c2b7;
+      --dd-hair: #2c2c2a;
+      --dd-axis: #383835;
+      --dd-border: rgba(255, 255, 255, 0.1);
+      --dd-solar: #d95926;
+      --dd-bat: #199e70;
+      --dd-grid: #3987e5;
+    }
+  }
+}
+
+/* ---------- Página ------------------------------------------------------ */
+html,
+body {
+  background: var(--dd-page);
+  color: var(--dd-ink);
+}
+body {
+  margin: 0;
+}
+
+/* Painel ESPHome original fica recolhido até ser pedido. */
+body.dd-ready:not(.dd-esp-open) esp-app {
+  display: none;
+}
+body.dd-esp-open esp-app {
+  display: block;
+  border-top: 1px solid var(--dd-border);
+  margin-top: 8px;
+}
+
+/* ---------- Estrutura --------------------------------------------------- */
+#deye-dash {
+  box-sizing: border-box;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 16px;
+  font: 400 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--dd-ink);
+  -webkit-text-size-adjust: 100%;
+}
+#deye-dash *,
+#deye-dash *::before,
+#deye-dash *::after {
+  box-sizing: inherit;
+}
+#deye-dash [hidden] {
+  display: none !important;
+}
+#deye-dash h1,
+#deye-dash h2,
+#deye-dash p,
+#deye-dash dl,
+#deye-dash dd {
+  margin: 0;
+}
+
+.dd-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-bottom: 16px;
+}
+.dd-top h1 {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.dd-sub {
+  color: var(--dd-ink-2);
+  font-size: 13px;
+}
+
+.dd-main,
+.dd-tiles {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr);
+}
+.dd-main {
+  margin-bottom: 12px;
+}
+.dd-tiles {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (min-width: 900px) {
+  .dd-main {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  }
+  .dd-tiles {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+@media (max-width: 359px) {
+  .dd-tiles {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.dd-card {
+  background: var(--dd-surface);
+  border: 1px solid var(--dd-border);
+  border-radius: 16px;
+  padding: 16px;
+  min-width: 0;
+}
+
+/* ---------- Estado da ligação ------------------------------------------- */
+.dd-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  border: 1px solid var(--dd-border);
+  border-radius: 999px;
+  background: var(--dd-surface);
+  color: var(--dd-ink-2);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.dd-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--dd-muted);
+  flex: none;
+}
+.dd-status[data-s="live"] .dd-dot {
+  background: var(--dd-good);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--dd-good) 50%, transparent);
+  animation: dd-pulse 2s ease-out infinite;
+}
+.dd-status[data-s="stale"] .dd-dot {
+  background: var(--dd-warn);
+}
+.dd-status[data-s="offline"] .dd-dot {
+  background: var(--dd-crit);
+}
+@keyframes dd-pulse {
+  to {
+    box-shadow: 0 0 0 6px transparent;
+  }
+}
+
+/* ---------- Destaque (produção agora) ----------------------------------- */
+.dd-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.dd-eyebrow {
+  color: var(--dd-ink-2);
+  font-size: 13px;
+  font-weight: 500;
+}
+.dd-hero-v {
+  font-size: clamp(48px, 12vw, 64px);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.dd-u {
+  margin-left: 0.2em;
+  font-size: 0.45em;
+  font-weight: 500;
+  color: var(--dd-ink-2);
+  letter-spacing: 0;
+}
+.dd-kv {
+  display: grid;
+  gap: 8px;
+  margin-top: auto;
+}
+.dd-kv > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--dd-hair);
+}
+.dd-kv dt {
+  color: var(--dd-ink-2);
+}
+.dd-kv dd {
+  font-weight: 600;
+  text-align: right;
+}
+
+/* ---------- Diagrama de fluxo ------------------------------------------- */
+.dd-flow-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.dd-flow {
+  display: block;
+  width: 100%;
+  max-width: 440px;
+  height: auto;
+  overflow: visible;
+}
+.dd-flow .track {
+  fill: none;
+  stroke: var(--dd-axis);
+  stroke-width: 2;
+}
+.dd-flow .dash {
+  fill: none;
+  stroke: var(--c);
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-dasharray: 0.1 12;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.dd-flow .is-on .dash {
+  opacity: 1;
+  animation: dd-move var(--dur, 1.4s) linear infinite;
+}
+.dd-flow .is-rev .dash {
+  animation-direction: reverse;
+}
+@keyframes dd-move {
+  from {
+    stroke-dashoffset: 12.1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.dd-flow .node circle {
+  fill: color-mix(in srgb, var(--c) 12%, var(--dd-surface));
+  stroke: var(--c);
+  stroke-width: 1.5;
+}
+.dd-flow .node .ic {
+  fill: var(--c);
+}
+.dd-flow .hub rect {
+  fill: var(--dd-page);
+  stroke: var(--dd-axis);
+  stroke-width: 1.5;
+}
+.dd-flow .hub .ic {
+  fill: var(--dd-ink-2);
+}
+.dd-flow text {
+  fill: var(--dd-ink);
+  font-size: 17px;
+  font-weight: 600;
+}
+.dd-flow text.lbl {
+  fill: var(--dd-ink-2);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+/* ---------- Mosaicos ---------------------------------------------------- */
+.dd-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.dd-tile-h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.dd-tile-h h2 {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--dd-ink-2);
+}
+.dd-ic {
+  width: 20px;
+  height: 20px;
+  fill: var(--c);
+  flex: none;
+}
+.dd-val {
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+.dd-approx {
+  margin-right: 0.15em;
+  font-weight: 400;
+  color: var(--dd-ink-2);
+}
+.dd-st {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 1.45em;
+  color: var(--dd-ink-2);
+  font-size: 13px;
+}
+.dd-st .dd-alert {
+  width: 16px;
+  height: 16px;
+  fill: var(--dd-crit);
+  flex: none;
+}
+
+.dd-meter {
+  height: 8px;
+  margin: 4px 0 2px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--dd-bat) 22%, var(--dd-surface));
+  overflow: hidden;
+}
+.dd-meter > span {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: 4px;
+  background: var(--dd-bat);
+  transition: width 0.6s ease;
+}
+.dd-tile.is-low .dd-meter {
+  background: color-mix(in srgb, var(--dd-crit) 22%, var(--dd-surface));
+}
+.dd-tile.is-low .dd-meter > span {
+  background: var(--dd-crit);
+}
+
+.dd-spark {
+  margin-top: auto;
+  padding-top: 8px;
+}
+.dd-spark svg {
+  display: block;
+  width: 100%;
+  height: 44px;
+  overflow: visible;
+  touch-action: pan-y;
+  cursor: crosshair;
+}
+.dd-spark .ln {
+  fill: none;
+  stroke: var(--c);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.dd-spark .ar {
+  fill: var(--c);
+  opacity: 0.1;
+}
+.dd-spark .zero {
+  stroke: var(--dd-axis);
+  stroke-width: 1;
+}
+.dd-spark .end,
+.dd-spark .hv {
+  fill: var(--c);
+  stroke: var(--dd-surface);
+  stroke-width: 2;
+}
+.dd-spark .xh {
+  stroke: var(--dd-muted);
+  stroke-width: 1;
+}
+.dd-cap {
+  margin-top: 4px;
+  color: var(--dd-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- Hoje e Sistema ---------------------------------------------- */
+.dd-row2 {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+}
+.dd-row2:not(:has(> :not([hidden]))) {
+  display: none;
+}
+.dd-h2 {
+  margin-bottom: 12px !important;
+  font-size: 15px;
+  font-weight: 600;
+}
+.dd-minis {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 16px;
+  margin-bottom: 16px !important;
+}
+.dd-mini dt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--dd-ink-2);
+  font-size: 13px;
+}
+.dd-mini dd {
+  font-size: 20px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.dd-key {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--c);
+  flex: none;
+}
+.dd-ratio + .dd-ratio {
+  margin-top: 12px;
+}
+.dd-ratio-h {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--dd-ink-2);
+  font-size: 13px;
+}
+.dd-ratio-h b {
+  color: var(--dd-ink);
+  font-weight: 600;
+}
+.dd-meter.dd-meter-n {
+  background: color-mix(in srgb, var(--dd-grid) 20%, var(--dd-surface));
+}
+.dd-meter.dd-meter-n > span {
+  background: var(--dd-grid);
+}
+.dd-note {
+  margin-top: 12px !important;
+  color: var(--dd-ink-2);
+  font-size: 13px;
+}
+.dd-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.dd-state[data-l="good"] .dd-dot {
+  background: var(--dd-good);
+}
+.dd-state[data-l="warn"] .dd-dot {
+  background: var(--dd-warn);
+}
+.dd-state[data-l="crit"] .dd-dot {
+  background: var(--dd-crit);
+}
+
+/* ---------- Rodapé ------------------------------------------------------ */
+.dd-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-top: 16px;
+  color: var(--dd-muted);
+  font-size: 12px;
+}
+.dd-btn {
+  font: inherit;
+  font-size: 13px;
+  color: var(--dd-ink);
+  background: var(--dd-surface);
+  border: 1px solid var(--dd-border);
+  border-radius: 999px;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+.dd-btn:hover {
+  background: color-mix(in srgb, var(--dd-ink) 6%, var(--dd-surface));
+}
+.dd-btn:focus-visible {
+  outline: 2px solid var(--dd-grid);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dd-flow .is-on .dash,
+  .dd-status[data-s="live"] .dd-dot {
+    animation: none;
+  }
+  .dd-meter > span {
+    transition: none;
+  }
+}
