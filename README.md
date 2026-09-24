@@ -36,16 +36,16 @@ O essencial está no bloco `web_server`:
 web_server:
   port: 80
   version: 3
-  css_url: https://cdn.jsdelivr.net/gh/DanielSilva-Shelly/DeyeWebServer@main/deye-dashboard.css
-  js_url: https://cdn.jsdelivr.net/gh/DanielSilva-Shelly/DeyeWebServer@main/deye-dashboard.js
+  css_url: https://cdn.jsdelivr.net/gh/DanielSilva-Shelly/DeyeWebServer@v1.0.0/deye-dashboard.css
+  js_url: https://cdn.jsdelivr.net/gh/DanielSilva-Shelly/DeyeWebServer@v1.0.0/deye-dashboard.js
 ```
 
 > ⚠️ **Não uses o URL do repositório** (`https://github.com/DanielSilva-Shelly/DeyeWebServer`) nem o `raw.githubusercontent.com`. O primeiro devolve uma página HTML; o segundo devolve `text/plain` com `nosniff`, e o browser recusa aplicar o ficheiro. O jsDelivr serve os ficheiros deste repositório público com o tipo MIME correto.
 
 ### Versões e cache
 
+- **Recomendado:** usar uma tag (`@v1.0.0`, definida em `dash_version` nas `substitutions`). Cada versão fica imutável e só muda quando alterares o YAML. Para publicar uma versão nova, cria a tag seguinte (`v1.1.0`) e atualiza `dash_version`.
 - `@main` segue o branch, mas o jsDelivr guarda-o em cache durante algumas horas. Para forçar a atualização: `https://purge.jsdelivr.net/gh/DanielSilva-Shelly/DeyeWebServer@main/deye-dashboard.js` (e o mesmo para o `.css`).
-- **Recomendado:** criar uma tag (`v1.0.0`) e pôr `dash_version: v1.0.0` nas `substitutions`. Assim cada versão fica imutável e só muda quando alterares o YAML.
 
 ### Dependência de internet
 
@@ -100,7 +100,7 @@ window.DEYE_DASH = {
   batteryPositiveIsDischarge: true,
 };
 const s = document.createElement("script");
-s.src = "https://cdn.jsdelivr.net/gh/DanielSilva-Shelly/DeyeWebServer@main/deye-dashboard.js";
+s.src = "https://cdn.jsdelivr.net/gh/DanielSilva-Shelly/DeyeWebServer@v1.0.0/deye-dashboard.js";
 document.body.appendChild(s);
 ```
 

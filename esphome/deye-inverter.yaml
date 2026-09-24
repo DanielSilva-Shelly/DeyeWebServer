@@ -11,7 +11,7 @@ substitutions:
   name: deye-inverter
   friendly_name: Deye Inverter
   # Versão do dashboard servida pelo jsDelivr: "main" ou uma tag (ex.: v1.0.0, recomendado)
-  dash_version: main
+  dash_version: v1.0.0
 
 esphome:
   name: ${name}
