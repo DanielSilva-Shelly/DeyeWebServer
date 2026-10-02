@@ -32,6 +32,8 @@ O `web_server` v3 desenha o UI dentro de um Web Component com Shadow DOM. Um `cs
 2. Renomeia `secrets.example.yaml` para `secrets.yaml` e preenche-o. Para gerar a chave da API: `openssl rand -base64 32`.
 3. Compila e grava. Abre `http://<ip-do-esp>/`.
 
+Sem Home Assistant à mão, usa `esphome/deye-inverter-esp8266-standalone.yaml`: tem três redes WiFi e todos os valores nas `substitutions`, por isso não precisa de `secrets.yaml`. Preenche o topo do ficheiro e grava com `pip install esphome && esphome run esphome/deye-inverter-esp8266-standalone.yaml`.
+
 O essencial está no bloco `web_server`:
 
 ```yaml
@@ -123,6 +125,27 @@ Checklist:
 - **ESP8266 em placa com USB (NodeMCU, D1 mini):** o chip USB-série também está ligado ao GPIO1/GPIO3 e pode interferir com o módulo RS485. Alimenta a placa pelo carregador e não por um PC, e desliga o módulo RS485 quando gravares por cabo.
 - **Cabo:** os pinos 7 e 8 são um par entrançado no RJ45, o que é bom para RS485. Para distâncias curtas não precisas de terminação de 120 Ω.
 - Com o ESP32, o Modbus usa a UART2 e os logs por USB ficam disponíveis. No ESP8266 o Modbus ocupa a UART0, por isso os logs só estão disponíveis pelo WiFi.
+
+## Diagnóstico: o ESP não se liga ao WiFi
+
+Os YAMLs definem um AP de recurso (`Deye Inverter Fallback` / `Deye Inverter Fallback Hotspot`) com `captive_portal`. Cerca de 90 s depois de falhar a ligação, o ESP liga esse AP. É assim que mudas de rede sem gravar nada:
+
+1. Com o telemóvel, liga-te ao AP de recurso (password em `fallback_password`). Se o AP não aparecer, o problema é de alimentação ou de arranque, não de WiFi.
+2. Abre `http://192.168.4.1/`. O portal não pede as credenciais do dashboard.
+3. A página lista as redes que o ESP vê. Isto é o melhor diagnóstico que tens:
+   - **A rede não aparece:** é 5 GHz, está oculta, ou o sinal não chega. O ESP8266 e o ESP32 só funcionam em 2,4 GHz.
+   - **Aparece:** escolhe-a, escreve a password e grava. O ESP liga-se em segundos.
+4. Para descobrir o IP: lista de clientes do router (procura `deye-inverter`) ou `http://deye-inverter.local/`.
+
+> ⚠️ As credenciais do portal ficam na flash e **substituem** a lista de redes do YAML, não se juntam a ela. Depois de usares o portal, o ESP passa a ligar-se só a essa rede, até gravares outra vez. Para teres várias casas, acrescenta as redes ao YAML.
+
+Se o portal não resolver, as causas mais comuns são:
+
+- **SSID ou password com erro:** confirma maiúsculas, hífenes e acentos. Compara com o que o portal mostra na lista.
+- **WPA3 ou "WPA2/WPA3 mixed" com PMF obrigatório:** o ESP8266 não suporta WPA3. Põe o router em WPA2.
+- **Rede oculta:** acrescenta `fast_connect: true` ao bloco `wifi`.
+- **Filtro de MAC** ou lista de dispositivos autorizados no router.
+- **Canal 12/13:** alguns módulos só ligam até ao canal 11. Fixa o router num canal entre 1 e 11.
 
 ## Diagnóstico: o dashboard aparece mas os valores ficam em "—"
 
