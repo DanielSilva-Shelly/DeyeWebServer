@@ -175,6 +175,23 @@ O estado passa a "Sem leituras do inversor". O ESP está ligado e a enviar os se
    - `Modbus error function code: 0x3 register … exception: 2`: o endereço do registo não existe neste modelo. Confirma que usas os endereços da tabela acima (decimais, por exemplo `184`) e não os de outros modelos.
 4. Se os valores chegarem mas parecerem absurdos (SOC acima de 100, potências enormes), o registo está errado ou o sinal está trocado: compara com a app Solarman.
 
+### Escada de diagnóstico
+
+Pela ordem que separa mais depressa o problema. Cada passo isola uma parte e os firmwares de apoio estão todos em `esphome/`.
+
+| # | Teste | Como | Prova |
+|---|---|---|---|
+| 1 | Trama enviada | `deye-debug-rs485.yaml`, procura `>>>` | UART, pinos e registo |
+| 2 | Loopback | jumper GPIO1→GPIO3, fios do módulo fora | o ESP recebe (`<<<` igual ao `>>>`) |
+| 3 | Alimentação | 5 V entre o fio vermelho do Grove e o GND | o transcetor tem energia |
+| 4 | Emissor | `deye-debug-tx.yaml`, mede A−B com o RJ45 fora | o módulo ataca o barramento |
+| 5 | Recetor | GND no A e 3V3 no B; o log inunda de `<<< 00` | o RO chega ao ESP |
+| 6 | Cabo de rede | continuidade dos terminais aos pinos do RJ45 | T568B e pinos certos |
+| 7 | Baud rate | `deye-debug-baud.yaml` | 9600, ou outro dos cinco |
+| 8 | Cabo Grove | continuidade do amarelo ao pino 1 do SP485EEN | o RO chega ao conector |
+
+Se o 1, o 2 e o 4 passarem e o 5 falhar, o módulo transmite mas não recebe: é o condutor amarelo do Grove ou a saída RO do chip, e nada do lado do inversor vai resolver isso.
+
 ### Firmware de diagnóstico do barramento
 
 Quando o log só mostra `Stop waiting for response from 1`, não sabes se o ESP está a enviar, se alguma coisa volta, ou se volta corrompida. Grava o `esphome/deye-debug-rs485.yaml`: tem `uart: debug:` ativo e escreve no log todos os bytes da UART, em hexadecimal e nos dois sentidos.
