@@ -1,0 +1,104 @@
+# Teste do módulo RS485 sem UART e sem multímetro — ESP8266 (ESP-12)
+#
+# Usa-se quando o dump da UART (deye-debug-rs485.yaml) só mostra ">>>" e nunca
+# "<<<": nada chega ao ESP e é preciso saber se a culpa é dos pinos, dos fios do
+# Grove, ou do módulo.
+#
+# Aqui o GPIO1 e o GPIO3 não são UART: são GPIO normais. De 2 em 2 segundos o
+# firmware inverte o nível do DI (GPIO1) e, 50 ms depois, lê o RO (GPIO3):
+#
+#   [teste] DI definido a 1
+#   [teste] RO leu 1          <- o RO acompanha o DI
+#
+# Faz este teste com o RJ45 DESLIGADO do inversor. Assim o barramento fica
+# isolado e, se o DI ficar num nível dominante, não perturba o Deye.
+#
+# Como ler:
+#
+#   RO acompanha o DI (segue ou é o inverso, mas muda)
+#     O módulo está alimentado e os dois fios de sinal estão nos pinos certos.
+#     O problema está no barramento: polaridade A/B, cabo, porta do Deye ou
+#     endereço Modbus.
+#
+#   RO fica sempre no mesmo valor
+#     O caminho de receção está cortado. Por esta ordem: troca os dois fios de
+#     sinal do Grove, confirma que o módulo tem alimentação (12 V no terminal),
+#     e só depois suspeita do GPIO3 do ESP.
+#
+#   RO oscila sozinho, sem relação com o DI
+#     O GPIO3 está a flutuar: o fio do RO não está ligado, ou o módulo não tem
+#     alimentação e a saída ficou em alta impedância.
+#
+# Gravar: cria um ficheiro novo no add-on do ESPHome com este conteúdo, preenche
+# a api_key e as redes, e instala por OTA.
+
+substitutions:
+  # ---- PREENCHE ISTO ANTES DE GRAVAR ----
+  api_key: COLA-AQUI-A-CHAVE-BASE64
+  wifi_ssid_1: Vodafone-18BB87
+  wifi_password_1: muda-esta-password
+  wifi_ssid_2: Vodafone-755A88
+  wifi_password_2: muda-esta-password
+  fallback_password: muda-esta-password
+
+esphome:
+  name: deye-inverter
+  friendly_name: Deye Inverter
+
+esp8266:
+  board: esp12e
+
+# baud_rate 0 continua a ser obrigatório: senão o logger ocupa o GPIO1 e o GPIO3.
+logger:
+  baud_rate: 0
+  level: DEBUG
+  logs:
+    wifi: INFO
+    api: INFO
+    api.connection: INFO
+
+api:
+  encryption:
+    key: ${api_key}
+
+ota:
+  - platform: esphome
+    encryption: {}
+
+wifi:
+  networks:
+    - ssid: ${wifi_ssid_1}
+      password: ${wifi_password_1}
+    - ssid: ${wifi_ssid_2}
+      password: ${wifi_password_2}
+  ap:
+    ssid: "Deye Inverter Fallback Hotspot"
+    password: ${fallback_password}
+
+captive_portal:
+
+output:
+  - platform: gpio
+    id: di_out
+    pin: GPIO1 # fio branco → DI do módulo
+
+binary_sensor:
+  - platform: gpio
+    id: ro_in
+    name: "RO (GPIO3)"
+    pin:
+      number: GPIO3 # fio amarelo ← RO do módulo
+      mode:
+        input: true
+
+interval:
+  - interval: 2s
+    then:
+      - lambda: |-
+          static bool lvl = true;
+          lvl = !lvl;
+          id(di_out).set_state(lvl);
+          ESP_LOGI("teste", "DI definido a %d", lvl);
+      - delay: 50ms
+      - lambda: |-
+          ESP_LOGI("teste", "RO leu %d", id(ro_in).state);
