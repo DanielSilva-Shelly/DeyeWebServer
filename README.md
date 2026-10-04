@@ -119,7 +119,9 @@ ESP32 GPIO16 (RX) ← RO  ├ módulo RS485 M5Stack (SP485EEN), Grove 5 V / GND
 
 Checklist:
 
-- **Porta certa no Deye:** usa a porta RS485/Modbus de monitorização. Não uses a *Meter-485* nem a *BMS*: nessas o inversor é o mestre do barramento.
+- **Porta certa no Deye:** usa a porta **Modbus** (porta 8), onde os pinos 7 e 8 são o `sunspec-485_A` e o `sunspec-485_B`. Não uses a *RS485/Meter* nem a *BMS/CAN*: nessas o inversor é o mestre e nunca responde a um pedido teu.
+- **Configuração no inversor:** a única necessária é o endereço, em `Settings → Advanced Function → Paral. Set3 → Modbus SN`, a 01. Não há nada mais para ativar, e o barramento é 9600 8N1.
+- **Testa o caminho de receção antes de culpar o inversor.** Com o RJ45 desligado e o módulo alimentado, força um diferencial nos terminais: GND do ESP no A e 3V3 no B. O recetor põe o RO em nível baixo, e uma linha permanentemente em baixo é lida pela UART como um fluxo contínuo de bytes nulos — o log inunda de `<<< 00:00:00`. Invertendo os jumpers, tem de parar. Se não inundar em nenhuma das posições, o caminho de receção está cortado e nada mais vai funcionar.
 - **Sem resposta?** Troca A/B. Não danifica nada e é a causa mais comum. Depois confirma o endereço Modbus (1 por defeito) e os 9600 baud.
 - **Alimentação do módulo:** o M5Stack Unit RS485 (U034) é especificado para **12 V no terminal** e traz um conversor step-down. O pinmap oficial mostra 5 V no Grove, mas não garante que os 5 V do Grove sozinhos cheguem para o transcetor. Antes de procurar o problema no barramento, confirma que o módulo está alimentado: com o módulo ligado e em repouso, mede a tensão entre A e B. Tem de dar algumas centenas de mV, com A acima de B. Se der 0 V, alimenta o terminal com 12 V.
 - **Níveis lógicos:** o SP485EEN funciona a 5 V. Com o módulo ligado mas sem tráfego, mede a tensão entre o pino RX (GPIO16 no ESP32, GPIO3 no ESP8266) e o GND. Se passar de 3,6 V, põe um divisor resistivo (por exemplo 10 kΩ / 20 kΩ) no RX. Nem o ESP32 nem o ESP8266 toleram 5 V.
