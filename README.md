@@ -124,6 +124,16 @@ Checklist:
 - **Alimentação do módulo:** o M5Stack Unit RS485 (U034) é especificado para **12 V no terminal** e traz um conversor step-down. O pinmap oficial mostra 5 V no Grove, mas não garante que os 5 V do Grove sozinhos cheguem para o transcetor. Antes de procurar o problema no barramento, confirma que o módulo está alimentado: com o módulo ligado e em repouso, mede a tensão entre A e B. Tem de dar algumas centenas de mV, com A acima de B. Se der 0 V, alimenta o terminal com 12 V.
 - **Níveis lógicos:** o SP485EEN funciona a 5 V. Com o módulo ligado mas sem tráfego, mede a tensão entre o pino RX (GPIO16 no ESP32, GPIO3 no ESP8266) e o GND. Se passar de 3,6 V, põe um divisor resistivo (por exemplo 10 kΩ / 20 kΩ) no RX. Nem o ESP32 nem o ESP8266 toleram 5 V.
 - **TX/RX trocados:** é a causa mais comum de silêncio total no barramento. Os fios do Grove não têm uma cor normalizada para o DI e o RO, por isso troca-os e volta a testar antes de mexer em mais nada.
+- **Controlo de direção:** o Unit RS485 só expõe quatro pinos no Grove, por isso comuta o DE sozinho a partir do sinal do DI. Esse circuito foi pensado para lógica de 5 V e pode não comutar de forma fiável com os 3,3 V de um ESP. Se o módulo nunca atacar o barramento, usa um módulo que exponha o pino DE e controla-o pelo ESPHome:
+
+  ```yaml
+  modbus:
+    id: modbus_bus
+    uart_id: uart_bus
+    flow_control_pin: GPIO5 # DE/RE do módulo: fica HIGH enquanto o ESP transmite
+  ```
+
+  Um módulo com MAX3485 (versão de 3,3 V) dispensa também o divisor no RX.
 - **ESP8266 em placa com USB (NodeMCU, D1 mini):** o chip USB-série também está ligado ao GPIO1/GPIO3 e pode interferir com o módulo RS485. Alimenta a placa pelo carregador e não por um PC, e desliga o módulo RS485 quando gravares por cabo.
 - **Cabo:** os pinos 7 e 8 são um par entrançado no RJ45, o que é bom para RS485. Para distâncias curtas não precisas de terminação de 120 Ω.
 - **T568A ou T568B:** as cores só dizem em que pino cada fio está se o cabo for T568B, onde o pino 1 é o branco-laranja e o pino 2 o laranja. Num cabo T568A esses dois fios caem nos pinos 3 e 6, que no Deye são **GND**: ficavas com o A e o B em curto à massa, e o barramento em silêncio. Olha para a ficha com o trinco virado para baixo: em T568B o primeiro fio à esquerda é branco-laranja; em T568A é branco-verde.
