@@ -13,7 +13,7 @@
 #
 # Mede em tensão contínua, entre o A e o B do terminal:
 #
-#   Cerca de -1 V a -2 V (ou +, se tiveres as pontas ao contrário)
+#   Cerca de 0,5 V a 1,2 V (ou negativo, se tiveres as pontas ao contrário)
 #     O transcetor está a atacar o barramento. O módulo está bom, e o problema
 #     está no inversor ou no cabo.
 #
@@ -23,8 +23,11 @@
 #     de direção não comuta com os 3,3 V do ESP. Nenhum dos dois se resolve
 #     por software: é preciso 12 V no terminal, ou outro módulo com pino DE.
 #
-# Mede também o A e o B contra o GND: num barramento atacado, cada um fica
-# entre 1 V e 4 V, com cerca de 2 V de diferença entre eles.
+# O valor é uma média: a linha só está atacada 42% do tempo, por isso não
+# esperes os 2 V de um barramento permanentemente ocupado. O que importa é
+# ser claramente diferente de zero.
+#
+# Mede também o A e o B contra o GND: ambos ficam entre 1 V e 4 V.
 
 substitutions:
   # ---- PREENCHE ISTO ANTES DE GRAVAR ----
@@ -76,7 +79,10 @@ uart:
   baud_rate: 9600
   stop_bits: 1
 
-# 80 bytes a 9600 baud ocupam ~83 ms: a linha fica atacada ~83% do tempo.
+# 40 bytes a 9600 baud ocupam ~42 ms: a linha fica atacada ~42% do tempo.
+# Nao aumentes este valor. Acima de ~60 bytes por cada 100 ms a UART enche
+# mais depressa do que drena, o uart.write passa a bloquear e o watchdog
+# reinicia o ESP em ciclo, o que o deixa inacessivel em safe mode.
 interval:
   - interval: 100ms
     then:
@@ -86,10 +92,7 @@ interval:
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+            0x00, 0x00, 0x00, 0x00
 
   - interval: 10s
     then:
