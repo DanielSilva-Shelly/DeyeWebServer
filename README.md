@@ -126,6 +126,8 @@ Checklist:
 - **TX/RX trocados:** é a causa mais comum de silêncio total no barramento. Os fios do Grove não têm uma cor normalizada para o DI e o RO, por isso troca-os e volta a testar antes de mexer em mais nada.
 - **ESP8266 em placa com USB (NodeMCU, D1 mini):** o chip USB-série também está ligado ao GPIO1/GPIO3 e pode interferir com o módulo RS485. Alimenta a placa pelo carregador e não por um PC, e desliga o módulo RS485 quando gravares por cabo.
 - **Cabo:** os pinos 7 e 8 são um par entrançado no RJ45, o que é bom para RS485. Para distâncias curtas não precisas de terminação de 120 Ω.
+- **T568A ou T568B:** as cores só dizem em que pino cada fio está se o cabo for T568B, onde o pino 1 é o branco-laranja e o pino 2 o laranja. Num cabo T568A esses dois fios caem nos pinos 3 e 6, que no Deye são **GND**: ficavas com o A e o B em curto à massa, e o barramento em silêncio. Olha para a ficha com o trinco virado para baixo: em T568B o primeiro fio à esquerda é branco-laranja; em T568A é branco-verde.
+- **Teste rápido do barramento:** com o RJ45 ligado ao inversor e o módulo alimentado, mede a tensão contínua entre o A e o B do terminal. Umas centenas de mV, com o A acima do B, significa que o barramento tem polarização e que os fios chegam aos pinos certos. Exatamente 0,00 V aponta para módulo sem alimentação ou fios nos pinos de GND.
 - Com o ESP32, o Modbus usa a UART2 e os logs por USB ficam disponíveis. No ESP8266 o Modbus ocupa a UART0, por isso os logs só estão disponíveis pelo WiFi.
 
 ## Diagnóstico: o ESP não se liga ao WiFi
