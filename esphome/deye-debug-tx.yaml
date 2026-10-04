@@ -27,7 +27,9 @@
 # esperes os 2 V de um barramento permanentemente ocupado. O que importa é
 # ser claramente diferente de zero.
 #
-# Mede também o A e o B contra o GND: ambos ficam entre 1 V e 4 V.
+# Contra o GND, espera cerca de 40% da tensão de pico no A e quase nada no B.
+# É normal: a média inclui os 58% do tempo em que o emissor está desligado e
+# as duas linhas flutuam. Dividir o A-B por 0,42 dá o diferencial de pico.
 
 substitutions:
   # ---- PREENCHE ISTO ANTES DE GRAVAR ----

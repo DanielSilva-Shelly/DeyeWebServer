@@ -1,0 +1,102 @@
+# Varrimento de baud rate no Modbus — ESP8266 (ESP-12)
+#
+# Usa-se quando todo o lado do ESP está provado (o módulo ataca o barramento,
+# cabo e pinos confirmados) e o inversor continua sem responder. Em vez de
+# gravar o firmware uma vez por cada baud rate, este faz o varrimento sozinho.
+#
+# A cada 3 s muda o baud rate e envia três vezes o pedido do registo 184:
+#
+#   [sweep] --- baud 19200 ---
+#   >>> 01:03:00:B8:00:01:04:2F
+#   <<< ...                       <- QUALQUER coisa aqui é uma vitória
+#
+# Ciclo completo: 9600, 19200, 4800, 38400, 57600, em 15 s.
+#
+# Como ler:
+#
+#   Aparece um "<<<" em algum dos baud rates
+#     O inversor responde. Se a resposta vier limpa, é esse o baud certo: fixa-o
+#     no YAML definitivo. Se vier lixo, o baud certo é outro dos cinco.
+#
+#   Nunca aparece "<<<" em nenhum
+#     O baud rate não é a causa. Troca o A com o B no terminal e repete o
+#     varrimento. Se continuar, tira o stick Solarman do inversor e repete.
+#
+# dummy_receiver: true é obrigatório aqui. Sem o componente modbus, ninguém lê
+# a UART, e sem alguém a ler os bytes o depurador nunca os veria.
+
+substitutions:
+  # ---- PREENCHE ISTO ANTES DE GRAVAR ----
+  api_key: COLA-AQUI-A-CHAVE-BASE64
+  wifi_ssid_1: Vodafone-18BB87
+  wifi_password_1: muda-esta-password
+  wifi_ssid_2: Vodafone-755A88
+  wifi_password_2: muda-esta-password
+  fallback_password: muda-esta-password
+
+esphome:
+  name: deye-inverter
+  friendly_name: Deye Inverter
+
+esp8266:
+  board: esp12e
+
+logger:
+  baud_rate: 0
+  level: DEBUG
+  logs:
+    uart_debug: DEBUG
+    wifi: INFO
+    api: INFO
+    api.connection: INFO
+
+api:
+  encryption:
+    key: ${api_key}
+
+ota:
+  - platform: esphome
+    encryption: {}
+
+wifi:
+  networks:
+    - ssid: ${wifi_ssid_1}
+      password: ${wifi_password_1}
+    - ssid: ${wifi_ssid_2}
+      password: ${wifi_password_2}
+  ap:
+    ssid: "Deye Inverter Fallback Hotspot"
+    password: ${fallback_password}
+
+captive_portal:
+
+uart:
+  id: uart_bus
+  tx_pin: GPIO1
+  rx_pin: GPIO3
+  baud_rate: 9600
+  stop_bits: 1
+  debug:
+    direction: BOTH
+    dummy_receiver: true
+    after:
+      timeout: 50ms
+      bytes: 64
+
+interval:
+  - interval: 3s
+    then:
+      - lambda: |-
+          static const uint32_t bauds[] = {9600, 19200, 4800, 38400, 57600};
+          static uint8_t i = 0;
+          uint32_t b = bauds[i];
+          i = (i + 1) % 5;
+          id(uart_bus).set_baud_rate(b);
+          id(uart_bus).load_settings(false);
+          ESP_LOGI("sweep", "--- baud %u ---", b);
+      # Pedido do registo 184 (SOC). O CRC nao depende do baud rate.
+      - uart.write: { id: uart_bus, data: [0x01, 0x03, 0x00, 0xB8, 0x00, 0x01, 0x04, 0x2F] }
+      - delay: 600ms
+      - uart.write: { id: uart_bus, data: [0x01, 0x03, 0x00, 0xB8, 0x00, 0x01, 0x04, 0x2F] }
+      - delay: 600ms
+      - uart.write: { id: uart_bus, data: [0x01, 0x03, 0x00, 0xB8, 0x00, 0x01, 0x04, 0x2F] }
