@@ -121,7 +121,9 @@ Checklist:
 
 - **Porta certa no Deye:** usa a porta RS485/Modbus de monitorização. Não uses a *Meter-485* nem a *BMS*: nessas o inversor é o mestre do barramento.
 - **Sem resposta?** Troca A/B. Não danifica nada e é a causa mais comum. Depois confirma o endereço Modbus (1 por defeito) e os 9600 baud.
+- **Alimentação do módulo:** o M5Stack Unit RS485 (U034) é especificado para **12 V no terminal** e traz um conversor step-down. O pinmap oficial mostra 5 V no Grove, mas não garante que os 5 V do Grove sozinhos cheguem para o transcetor. Antes de procurar o problema no barramento, confirma que o módulo está alimentado: com o módulo ligado e em repouso, mede a tensão entre A e B. Tem de dar algumas centenas de mV, com A acima de B. Se der 0 V, alimenta o terminal com 12 V.
 - **Níveis lógicos:** o SP485EEN funciona a 5 V. Com o módulo ligado mas sem tráfego, mede a tensão entre o pino RX (GPIO16 no ESP32, GPIO3 no ESP8266) e o GND. Se passar de 3,6 V, põe um divisor resistivo (por exemplo 10 kΩ / 20 kΩ) no RX. Nem o ESP32 nem o ESP8266 toleram 5 V.
+- **TX/RX trocados:** é a causa mais comum de silêncio total no barramento. Os fios do Grove não têm uma cor normalizada para o DI e o RO, por isso troca-os e volta a testar antes de mexer em mais nada.
 - **ESP8266 em placa com USB (NodeMCU, D1 mini):** o chip USB-série também está ligado ao GPIO1/GPIO3 e pode interferir com o módulo RS485. Alimenta a placa pelo carregador e não por um PC, e desliga o módulo RS485 quando gravares por cabo.
 - **Cabo:** os pinos 7 e 8 são um par entrançado no RJ45, o que é bom para RS485. Para distâncias curtas não precisas de terminação de 120 Ω.
 - Com o ESP32, o Modbus usa a UART2 e os logs por USB ficam disponíveis. No ESP8266 o Modbus ocupa a UART0, por isso os logs só estão disponíveis pelo WiFi.
@@ -158,6 +160,24 @@ O estado passa a "Sem leituras do inversor". O ESP está ligado e a enviar os se
    - `Received incorrect frame` ou `Received unexpected frame`: há respostas mas corrompidas ou de outro dispositivo. Confirma os 9600 baud, o par entrançado e se não há outro mestre no barramento.
    - `Modbus error function code: 0x3 register … exception: 2`: o endereço do registo não existe neste modelo. Confirma que usas os endereços da tabela acima (decimais, por exemplo `184`) e não os de outros modelos.
 4. Se os valores chegarem mas parecerem absurdos (SOC acima de 100, potências enormes), o registo está errado ou o sinal está trocado: compara com a app Solarman.
+
+### Firmware de diagnóstico do barramento
+
+Quando o log só mostra `Stop waiting for response from 1`, não sabes se o ESP está a enviar, se alguma coisa volta, ou se volta corrompida. Grava o `esphome/deye-debug-rs485.yaml`: tem `uart: debug:` ativo e escreve no log todos os bytes da UART, em hexadecimal e nos dois sentidos.
+
+```
+>>> 01:03:00:B8:00:01:04:2F     o ESP pediu o registo 184 (SOC)
+<<< 01:03:02:00:3C:B9:9E        o inversor respondeu
+```
+
+| O que vês | O que significa |
+|---|---|
+| só `>>>` | nada chega ao ESP: módulo sem alimentação, Grove trocado, A/B trocados, porta errada no Deye ou endereço Modbus errado |
+| `>>>` e um `<<<` igual | é o eco do próprio envio; a UART, os pinos e o módulo estão bons nos dois sentidos, falta o inversor responder |
+| `<<<` diferente, com erro no Modbus | há comunicação: é CRC, baud rate ou registo errado |
+| nem `>>>` | a UART não envia; confirma o firmware e o `baud_rate: 0` no `logger` |
+
+Para isolar o ESP do resto, faz um loopback: desliga os dois fios de sinal do módulo e põe um jumper entre o GPIO1 e o GPIO3. Cada `>>>` tem de aparecer logo como `<<<` igual. Se aparecer, o ESP está bom e o problema é do módulo ou do barramento.
 
 ## Pré-visualização local
 
