@@ -8,15 +8,20 @@
 #
 #   [sweep] --- baud 19200 ---
 #   >>> 01:03:00:B8:00:01:04:2F
-#   <<< ...                       <- QUALQUER coisa aqui é uma vitória
+#   <<< 01:03:02:00:3C:B9:9E      <- resposta real: 7 bytes, começa por 01:03
 #
 # Ciclo completo: 9600, 19200, 4800, 38400, 57600, em 15 s.
 #
-# Como ler:
+# Como ler. ATENÇÃO: não basta aparecer um "<<<", é preciso olhar para ele.
 #
-#   Aparece um "<<<" em algum dos baud rates
-#     O inversor responde. Se a resposta vier limpa, é esse o baud certo: fixa-o
-#     no YAML definitivo. Se vier lixo, o baud certo é outro dos cinco.
+#   Um "<<<" de 7 bytes a começar por 01:03
+#     O inversor responde e esse é o baud certo. Fixa-o no YAML definitivo.
+#
+#   Um único byte, sempre o mesmo, e diferente por baud rate (F0, FF, FE, FC)
+#     NÃO é resposta. É um byte espúrio gerado pela própria reconfiguração da
+#     UART no load_settings: um evento elétrico de duração fixa amostrado a
+#     velocidades diferentes. Confirma-o repetindo o varrimento com o RJ45
+#     desligado do inversor; se os mesmos bytes aparecerem, são locais.
 #
 #   Nunca aparece "<<<" em nenhum
 #     O baud rate não é a causa. Troca o A com o B no terminal e repete o
