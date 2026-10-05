@@ -119,6 +119,7 @@ ESP32 GPIO16 (RX) ← RO  ├ módulo RS485 M5Stack (SP485EEN), Grove 5 V / GND
 
 Checklist:
 
+- **Alimentação nas portas:** a porta **485/Meter** fornece alimentação em alguns pinos — é assim que alimenta dongles como os módulos LoRa. A porta **Modbus** não fornece nada. Nunca ligues o A ou o B a um pino com tensão: os 12 V estão no limite absoluto de um recetor RS485, que tolera até +12 V, e é o tipo de ligação que mata o recetor e deixa o emissor a funcionar.
 - **Porta certa no Deye:** usa a porta **Modbus** (porta 8), onde os pinos 7 e 8 são o `sunspec-485_A` e o `sunspec-485_B`. Não uses a *RS485/Meter* nem a *BMS/CAN*: nessas o inversor é o mestre e nunca responde a um pedido teu.
 - **Configuração no inversor:** a única necessária é o endereço, em `Settings → Advanced Function → Paral. Set3 → Modbus SN`, a 01. Não há nada mais para ativar, e o barramento é 9600 8N1.
 - **Testa o caminho de receção antes de culpar o inversor.** Com o RJ45 desligado e o módulo alimentado, força um diferencial nos terminais: GND do ESP no A e 3V3 no B. O recetor põe o RO em nível baixo, e uma linha permanentemente em baixo é lida pela UART como um fluxo contínuo de bytes nulos — o log inunda de `<<< 00:00:00`. Invertendo os jumpers, tem de parar. Se não inundar em nenhuma das posições, o caminho de receção está cortado e nada mais vai funcionar.
