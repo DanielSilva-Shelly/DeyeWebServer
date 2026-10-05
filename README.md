@@ -186,12 +186,16 @@ Pela ordem que separa mais depressa o problema. Cada passo isola uma parte e os 
 | 2 | Loopback | jumper GPIO1→GPIO3, fios do módulo fora | o ESP recebe (`<<<` igual ao `>>>`) |
 | 3 | Alimentação | 5 V entre o fio vermelho do Grove e o GND | o transcetor tem energia |
 | 4 | Emissor | `deye-debug-tx.yaml`, mede A−B com o RJ45 fora | o módulo ataca o barramento |
-| 5 | Recetor | GND no A e 3V3 no B; o log inunda de `<<< 00` | o RO chega ao ESP |
+| 5 | Recetor | `deye-debug-gerador.yaml`: dois GPIO atacam o A e o B em antifase | o RO chega ao ESP |
 | 6 | Cabo de rede | continuidade dos terminais aos pinos do RJ45 | T568B e pinos certos |
 | 7 | Baud rate | `deye-debug-baud.yaml` | 9600, ou outro dos cinco |
 | 8 | Cabo Grove | continuidade do amarelo ao pino 1 do SP485EEN | o RO chega ao conector |
 
 Se o 1, o 2 e o 4 passarem e o 5 falhar, o módulo transmite mas não recebe: é o condutor amarelo do Grove ou a saída RO do chip, e nada do lado do inversor vai resolver isso.
+
+> ⚠️ **Não testes a receção com um nível fixo** (A a GND e B a 3V3, à espera de um fluxo de bytes nulos). Uma linha presa em baixo é uma condição de *break*, e a UART pode não entregar byte nenhum quando o bit de stop falha — um recetor bom dá exatamente o mesmo silêncio que um avariado. Um recetor só se testa com **transições**, e é para isso que serve o `deye-debug-gerador.yaml`. Um nível fixo também põe os teus jumpers a lutar contra o emissor do módulo, por isso desliga sempre o fio do DI durante o teste.
+
+Com os cinco primeiros a passar, o problema é do inversor. Aí: troca o A com o B, desliga qualquer dongle do inversor que possa partilhar o barramento (LoRa, stick Solarman), e mede a resistência entre o A e o B a olhar para a porta do inversor, com o teu módulo desligado — 10 a 15 kΩ ou 120 Ω significa que há transcetor ligado nesses pinos; aberto significa que não há nada.
 
 ### Firmware de diagnóstico do barramento
 
