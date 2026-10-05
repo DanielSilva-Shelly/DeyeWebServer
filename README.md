@@ -32,6 +32,14 @@ O `web_server` v3 desenha o UI dentro de um Web Component com Shadow DOM. Um `cs
 2. Renomeia `secrets.example.yaml` para `secrets.yaml` e preenche-o. Para gerar a chave da API: `openssl rand -base64 32`.
 3. Compila e grava. Abre `http://<ip-do-esp>/`.
 
+### Sem RS485: os dados vindos do Home Assistant
+
+O coletor WiFi do inversor expõe Modbus TCP (porta 8899, protocolo Solarman V5). O ESPHome não tem cliente Modbus TCP, por isso o caminho é pelo Home Assistant: instala a integração [ha-solarman](https://github.com/davidrapan/ha-solarman) apontada ao IP do coletor, e usa `esphome/deye-inverter-esp8266-ha.yaml`, que importa os valores do HA pela API do ESPHome em vez de interrogar o inversor por Modbus.
+
+O dashboard funciona sem uma alteração, porque identifica as entidades pelo **nome** e não pela origem. Só tens de preencher os `entity_id` do teu HA.
+
+Troca-offs: o ESP passa a depender do HA e do coletor, e o coletor costuma aceitar um só cliente Modbus de cada vez — polling agressivo pode cortar-lhe a ligação à cloud Solarman. O caminho RS485 é mais direto e independente.
+
 Sem Home Assistant à mão, usa `esphome/deye-inverter-esp8266-standalone.yaml`: tem três redes WiFi e todos os valores nas `substitutions`, por isso não precisa de `secrets.yaml`. Preenche o topo do ficheiro e grava com `pip install esphome && esphome run esphome/deye-inverter-esp8266-standalone.yaml`.
 
 O essencial está no bloco `web_server`:
