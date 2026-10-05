@@ -1,0 +1,296 @@
+# Deye SUN-6K-SG05LP1  →  coletor WiFi  →  Home Assistant  →  ESP8266  →  dashboard
+#
+# Variante SEM RS485. Em vez de interrogar o inversor por Modbus, o ESP importa
+# os valores do Home Assistant pela API do ESPHome. Serve quando o caminho
+# RS485 não está disponível e o coletor WiFi do inversor já está a entregar
+# dados ao HA.
+#
+# No Home Assistant, instala primeiro a integração Solarman (HACS,
+# davidrapan/ha-solarman) e aponta-a ao IP do coletor, porta 8899. Ela já traz
+# o mapa de registos do SG05LP1 — o mesmo de onde saíram os registos dos
+# outros YAMLs deste repositório.
+#
+# COMO PREENCHER: substitui cada `entity_id` pelo id real no teu HA. Vais
+# encontrá-los em Ferramentas de Desenvolvimento → Estados. Os NOMES dos
+# sensores aqui têm de ficar como estão: é por eles que o dashboard os
+# identifica. Se um sensor não existir no teu HA, apaga o bloco todo — o
+# dashboard esconde sozinho as secções sem dados.
+#
+# Dependência a ter em conta: o ESP passa a depender do HA e do coletor. Se um
+# dos dois cair, o dashboard mostra "Sem leituras do inversor". O caminho RS485
+# é mais direto e independente, por isso continua a valer a pena quando houver
+# um módulo com o pino DE acessível.
+
+substitutions:
+  name: deye-inverter
+  friendly_name: Deye Inverter
+  dash_version: v1.0.1
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+
+esp8266:
+  board: esp12e
+
+logger:
+  level: INFO
+
+# A API é obrigatória nesta variante: é por ela que os valores chegam do HA.
+api:
+  encryption:
+    key: !secret api_key
+
+ota:
+  - platform: esphome
+    encryption: {}
+
+wifi:
+  networks:
+    - ssid: !secret wifi_ssid_1
+      password: !secret wifi_password_1
+    - ssid: !secret wifi_ssid_2
+      password: !secret wifi_password_2
+  ap:
+    ssid: "Deye Inverter Fallback"
+    password: !secret fallback_password
+
+captive_portal:
+
+web_server:
+  port: 80
+  version: 3
+  css_url: https://cdn.jsdelivr.net/gh/DanielSilva-Shelly/DeyeWebServer@${dash_version}/deye-dashboard.css
+  js_url: https://cdn.jsdelivr.net/gh/DanielSilva-Shelly/DeyeWebServer@${dash_version}/deye-dashboard.js
+  ota: false
+  auth:
+    type: digest
+    username: admin
+    password: !secret web_password
+  sorting_groups:
+    - id: solar
+      name: Solar
+      sorting_weight: 1
+    - id: bateria
+      name: Bateria
+      sorting_weight: 2
+    - id: rede
+      name: Rede Elétrica
+      sorting_weight: 3
+    - id: casa
+      name: Casa
+      sorting_weight: 4
+    - id: sistema
+      name: Sistema
+      sorting_weight: 5
+
+# Modelo comum: chaves com "." são ignoradas pelo ESPHome.
+.ha: &ha
+  platform: homeassistant
+
+sensor:
+  # ---------- Potências ----------
+  - <<: *ha
+    id: pv1
+    name: "Produção PV1"
+    entity_id: sensor.MUDA_ISTO_pv1_power
+    unit_of_measurement: W
+    device_class: power
+    accuracy_decimals: 0
+    web_server: { sorting_group_id: solar, sorting_weight: 1 }
+
+  - <<: *ha
+    name: "Produção PV2"
+    entity_id: sensor.MUDA_ISTO_pv2_power
+    unit_of_measurement: W
+    device_class: power
+    accuracy_decimals: 0
+    web_server: { sorting_group_id: solar, sorting_weight: 2 }
+
+  - <<: *ha
+    id: bateria_soc
+    name: "Nível da Bateria"
+    entity_id: sensor.MUDA_ISTO_battery_soc
+    unit_of_measurement: "%"
+    device_class: battery
+    accuracy_decimals: 0
+    web_server: { sorting_group_id: bateria, sorting_weight: 1 }
+
+  - <<: *ha
+    name: "Potência da Bateria" # + descarga / − carga
+    entity_id: sensor.MUDA_ISTO_battery_power
+    unit_of_measurement: W
+    device_class: power
+    accuracy_decimals: 0
+    web_server: { sorting_group_id: bateria, sorting_weight: 2 }
+
+  - <<: *ha
+    name: "Potência da Rede" # + compra / − venda
+    entity_id: sensor.MUDA_ISTO_grid_power
+    unit_of_measurement: W
+    device_class: power
+    accuracy_decimals: 0
+    web_server: { sorting_group_id: rede, sorting_weight: 1 }
+
+  - <<: *ha
+    name: "Consumo da Casa"
+    entity_id: sensor.MUDA_ISTO_load_power
+    unit_of_measurement: W
+    device_class: power
+    accuracy_decimals: 0
+    web_server: { sorting_group_id: casa, sorting_weight: 1 }
+
+  # ---------- Energia de hoje ----------
+  - <<: *ha
+    name: "Produção Solar Hoje"
+    entity_id: sensor.MUDA_ISTO_today_production
+    unit_of_measurement: kWh
+    device_class: energy
+    accuracy_decimals: 1
+    web_server: { sorting_group_id: solar, sorting_weight: 3 }
+
+  - <<: *ha
+    name: "Carga da Bateria Hoje"
+    entity_id: sensor.MUDA_ISTO_today_battery_charge
+    unit_of_measurement: kWh
+    device_class: energy
+    accuracy_decimals: 1
+    web_server: { sorting_group_id: bateria, sorting_weight: 3 }
+
+  - <<: *ha
+    name: "Descarga da Bateria Hoje"
+    entity_id: sensor.MUDA_ISTO_today_battery_discharge
+    unit_of_measurement: kWh
+    device_class: energy
+    accuracy_decimals: 1
+    web_server: { sorting_group_id: bateria, sorting_weight: 4 }
+
+  - <<: *ha
+    name: "Energia Comprada Hoje"
+    entity_id: sensor.MUDA_ISTO_today_energy_import
+    unit_of_measurement: kWh
+    device_class: energy
+    accuracy_decimals: 1
+    web_server: { sorting_group_id: rede, sorting_weight: 2 }
+
+  - <<: *ha
+    name: "Energia Vendida Hoje"
+    entity_id: sensor.MUDA_ISTO_today_energy_export
+    unit_of_measurement: kWh
+    device_class: energy
+    accuracy_decimals: 1
+    web_server: { sorting_group_id: rede, sorting_weight: 3 }
+
+  - <<: *ha
+    name: "Consumo Hoje"
+    entity_id: sensor.MUDA_ISTO_today_load_consumption
+    unit_of_measurement: kWh
+    device_class: energy
+    accuracy_decimals: 1
+    web_server: { sorting_group_id: casa, sorting_weight: 2 }
+
+  - <<: *ha
+    name: "Produção Solar Total"
+    entity_id: sensor.MUDA_ISTO_total_production
+    unit_of_measurement: kWh
+    device_class: energy
+    accuracy_decimals: 1
+    web_server: { sorting_group_id: solar, sorting_weight: 4 }
+
+  # ---------- Tensões, frequência e temperaturas ----------
+  - <<: *ha
+    name: "Tensão da Rede"
+    entity_id: sensor.MUDA_ISTO_grid_voltage
+    unit_of_measurement: V
+    device_class: voltage
+    accuracy_decimals: 1
+    web_server: { sorting_group_id: rede, sorting_weight: 4 }
+
+  - <<: *ha
+    name: "Frequência da Rede"
+    entity_id: sensor.MUDA_ISTO_grid_frequency
+    unit_of_measurement: Hz
+    device_class: frequency
+    accuracy_decimals: 2
+    web_server: { sorting_group_id: rede, sorting_weight: 5 }
+
+  - <<: *ha
+    name: "Tensão da Bateria"
+    entity_id: sensor.MUDA_ISTO_battery_voltage
+    unit_of_measurement: V
+    device_class: voltage
+    accuracy_decimals: 2
+    web_server: { sorting_group_id: bateria, sorting_weight: 5 }
+
+  - <<: *ha
+    name: "Temperatura da Bateria"
+    entity_id: sensor.MUDA_ISTO_battery_temperature
+    unit_of_measurement: °C
+    device_class: temperature
+    accuracy_decimals: 1
+    web_server: { sorting_group_id: bateria, sorting_weight: 6 }
+
+  - <<: *ha
+    name: "Temperatura DC do Inversor"
+    entity_id: sensor.MUDA_ISTO_dc_temperature
+    unit_of_measurement: °C
+    device_class: temperature
+    accuracy_decimals: 1
+    web_server: { sorting_group_id: sistema, sorting_weight: 3 }
+
+  - <<: *ha
+    name: "Temperatura AC do Inversor"
+    entity_id: sensor.MUDA_ISTO_ac_temperature
+    unit_of_measurement: °C
+    device_class: temperature
+    accuracy_decimals: 1
+    web_server: { sorting_group_id: sistema, sorting_weight: 4 }
+
+  - <<: *ha
+    name: "Tensão PV1"
+    entity_id: sensor.MUDA_ISTO_pv1_voltage
+    unit_of_measurement: V
+    device_class: voltage
+    accuracy_decimals: 0
+    web_server: { sorting_group_id: solar, sorting_weight: 5 }
+
+  - <<: *ha
+    name: "Tensão PV2"
+    entity_id: sensor.MUDA_ISTO_pv2_voltage
+    unit_of_measurement: V
+    device_class: voltage
+    accuracy_decimals: 0
+    web_server: { sorting_group_id: solar, sorting_weight: 6 }
+
+  # ---------- Diagnóstico do ESP ----------
+  - platform: wifi_signal
+    name: "Sinal WiFi"
+    update_interval: 60s
+    entity_category: diagnostic
+    web_server: { sorting_group_id: sistema, sorting_weight: 10 }
+
+  - platform: uptime
+    name: "Tempo Ligado"
+    update_interval: 60s
+    entity_category: diagnostic
+    web_server: { sorting_group_id: sistema, sorting_weight: 11 }
+
+text_sensor:
+  - platform: homeassistant
+    name: "Estado do Inversor"
+    entity_id: sensor.MUDA_ISTO_running_state
+    icon: mdi:information-outline
+    web_server: { sorting_group_id: sistema, sorting_weight: 1 }
+
+binary_sensor:
+  # Falso quando o HA ou o coletor deixam de entregar valores.
+  - platform: template
+    name: "Ligação ao Inversor"
+    device_class: connectivity
+    lambda: 'return !std::isnan(id(bateria_soc).state);'
+    web_server: { sorting_group_id: sistema, sorting_weight: 2 }
+
+button:
+  - platform: restart
+    name: "Reiniciar ESP"
+    web_server: { sorting_group_id: sistema, sorting_weight: 20 }

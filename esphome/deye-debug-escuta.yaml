@@ -1,0 +1,103 @@
+# Escuta passiva do barramento RS485 — ESP8266 (ESP-12)
+#
+# Para usar na porta BMS 485 do inversor, onde o Deye é o MESTRE e interroga a
+# bateria continuamente. Há tráfego real sem precisares de enviar nada, por isso
+# este é o teste definitivo do caminho de receção: se chegar um único byte, o
+# módulo recebe; se não chegar nada em vários minutos, não recebe.
+#
+# Este firmware NÃO TRANSMITE. A UART é declarada só com rx_pin, por isso não
+# existe caminho de software para enviar um byte.
+#
+# SEGURANÇA, e não é opcional: o barramento BMS controla a carga e a descarga da
+# bateria. Injetar tráfego ali pode corromper a comunicação entre o inversor e a
+# bateria. Além de este firmware não transmitir, DESLIGA FISICAMENTE o fio branco
+# (DI) do módulo. Assim o transcetor não tem como atacar a linha, aconteça o que
+# acontecer.
+#
+# Ligação: A e B da porta BMS aos terminais do módulo, e o GND. Consulta a tabela
+# "Definition of RJ45 Port Pin for BMS" no manual. Se trocares o A com o B, o
+# teste continua válido: aparece lixo em vez de tramas, e lixo também conta.
+#
+# O baud rate do barramento BMS não é necessariamente 9600, por isso o firmware
+# percorre cinco valores, 5 s em cada um. Para este teste o baud certo é
+# indiferente — só queremos saber se chegam bytes.
+#
+# Como ler:
+#
+#   Aparece qualquer "<<<", em qualquer baud rate
+#     O caminho de receção funciona. O módulo não é o problema, e o que falta
+#     resolver está na porta Modbus do inversor.
+#
+#   Nada em vários minutos
+#     O caminho de receção está cortado: condutor amarelo do Grove, ou a saída
+#     RO do chip. Substituir o módulo é o único caminho.
+
+substitutions:
+  # ---- PREENCHE ISTO ANTES DE GRAVAR ----
+  api_key: COLA-AQUI-A-CHAVE-BASE64
+  wifi_ssid_1: Vodafone-18BB87
+  wifi_password_1: muda-esta-password
+  wifi_ssid_2: Vodafone-755A88
+  wifi_password_2: muda-esta-password
+  fallback_password: muda-esta-password
+
+esphome:
+  name: deye-inverter
+  friendly_name: Deye Inverter
+
+esp8266:
+  board: esp12e
+
+logger:
+  baud_rate: 0
+  level: DEBUG
+  logs:
+    uart_debug: DEBUG
+    wifi: INFO
+    api: INFO
+    api.connection: INFO
+
+api:
+  encryption:
+    key: ${api_key}
+
+ota:
+  - platform: esphome
+    encryption: {}
+
+wifi:
+  networks:
+    - ssid: ${wifi_ssid_1}
+      password: ${wifi_password_1}
+    - ssid: ${wifi_ssid_2}
+      password: ${wifi_password_2}
+  ap:
+    ssid: "Deye Inverter Fallback Hotspot"
+    password: ${fallback_password}
+
+captive_portal:
+
+# Sem tx_pin: não há como transmitir, nem por engano.
+uart:
+  id: uart_bus
+  rx_pin: GPIO3 # fio amarelo ← RO do módulo
+  baud_rate: 9600
+  stop_bits: 1
+  debug:
+    direction: BOTH
+    dummy_receiver: true
+    after:
+      timeout: 50ms
+      bytes: 64
+
+interval:
+  - interval: 5s
+    then:
+      - lambda: |-
+          static const uint32_t bauds[] = {9600, 19200, 4800, 115200, 38400};
+          static uint8_t i = 0;
+          uint32_t b = bauds[i];
+          i = (i + 1) % 5;
+          id(uart_bus).set_baud_rate(b);
+          id(uart_bus).load_settings(false);
+          ESP_LOGI("escuta", "--- a escutar a %u baud ---", b);

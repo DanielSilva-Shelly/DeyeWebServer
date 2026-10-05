@@ -1,0 +1,125 @@
+# Gerador de sinal RS485 por software — ESP8266 (ESP-12)
+#
+# Testa o CAMINHO DE RECEÇÃO com tramas verdadeiras, sem depender do inversor
+# nem do emissor do módulo.
+#
+# Porque é preciso: forçar um nível fixo nos terminais (A a GND, B a 3V3) não
+# serve de teste. Uma linha presa em baixo é uma condição de break, e a UART
+# pode não entregar byte nenhum quando o bit de stop falha — um recetor bom dá
+# o mesmo silêncio que um avariado. Um recetor só se testa com transições.
+#
+# O que isto faz: dois GPIO livres atacam o A e o B em antifase, com temporização
+# de 9600 baud, formando bytes reais com bit de start e de stop. É uma UART por
+# software a injetar dados no barramento. O recetor do módulo vê um diferencial
+# legítimo e o RO devolve bytes à UART de hardware.
+#
+# LIGAÇÃO (RJ45 fora do inversor, módulo alimentado):
+#
+#   GPIO4  → terminal A        jumper
+#   GPIO5  → terminal B        jumper
+#   GPIO3  ← fio amarelo (RO)  como está
+#   fio branco (DI)            DESLIGADO do GPIO1
+#
+# O fio do DI tem de sair: sem ele o emissor do módulo nunca liga e não há
+# contenção contra os nossos jumpers. Era esse o defeito do teste anterior.
+#
+# O que esperar no log, de 2 em 2 segundos:
+#
+#   [gerador]: injetados 4 bytes (55 AA 55 AA)
+#   <<< 55:AA:55:AA        o recetor funciona. Caso encerrado.
+#   <<< 33:CC:33:CC        bytes diferentes porque o A e o B estão invertidos
+#                          nos terminais. Também conta: chegaram dados.
+#
+#   Nada, em vários ciclos
+#     Aí sim, o caminho de receção está cortado — e desta vez o teste é válido,
+#     porque injetámos transições reais a 3,3 V, dezesseis vezes acima do
+#     limiar de 200 mV de qualquer recetor RS485.
+
+substitutions:
+  # ---- PREENCHE ISTO ANTES DE GRAVAR ----
+  api_key: COLA-AQUI-A-CHAVE-BASE64
+  wifi_ssid_1: Vodafone-18BB87
+  wifi_password_1: muda-esta-password
+  wifi_ssid_2: Vodafone-755A88
+  wifi_password_2: muda-esta-password
+  fallback_password: muda-esta-password
+
+esphome:
+  name: deye-inverter
+  friendly_name: Deye Inverter
+  on_boot:
+    priority: -100
+    then:
+      - lambda: |-
+          pinMode(4, OUTPUT);
+          pinMode(5, OUTPUT);
+          // Repouso do RS485 (marca): A acima de B.
+          digitalWrite(4, HIGH);
+          digitalWrite(5, LOW);
+
+esp8266:
+  board: esp12e
+
+logger:
+  baud_rate: 0
+  level: DEBUG
+  logs:
+    uart_debug: DEBUG
+    wifi: INFO
+    api: INFO
+    api.connection: INFO
+
+api:
+  encryption:
+    key: ${api_key}
+
+ota:
+  - platform: esphome
+    encryption: {}
+
+wifi:
+  networks:
+    - ssid: ${wifi_ssid_1}
+      password: ${wifi_password_1}
+    - ssid: ${wifi_ssid_2}
+      password: ${wifi_password_2}
+  ap:
+    ssid: "Deye Inverter Fallback Hotspot"
+    password: ${fallback_password}
+
+captive_portal:
+
+# Só rx_pin: este firmware não transmite pela UART de hardware.
+uart:
+  id: uart_bus
+  rx_pin: GPIO3
+  baud_rate: 9600
+  stop_bits: 1
+  debug:
+    direction: BOTH
+    dummy_receiver: true
+    after:
+      timeout: 50ms
+      bytes: 64
+
+interval:
+  - interval: 2s
+    then:
+      - lambda: |-
+          // UART por software a 9600 baud: 104 us por bit.
+          // Marca = A alto / B baixo. Espaço = A baixo / B alto.
+          static const uint8_t pattern[4] = {0x55, 0xAA, 0x55, 0xAA};
+          for (uint8_t n = 0; n < 4; n++) {
+            uint8_t v = pattern[n];
+            digitalWrite(4, LOW);  digitalWrite(5, HIGH);  // start
+            delayMicroseconds(104);
+            for (uint8_t b = 0; b < 8; b++) {              // 8 bits, LSB primeiro
+              bool bit = (v >> b) & 1;
+              digitalWrite(4, bit);
+              digitalWrite(5, !bit);
+              delayMicroseconds(104);
+            }
+            digitalWrite(4, HIGH); digitalWrite(5, LOW);   // stop + pausa
+            delayMicroseconds(208);
+          }
+          ESP_LOGI("gerador", "injetados 4 bytes (55 AA 55 AA)");

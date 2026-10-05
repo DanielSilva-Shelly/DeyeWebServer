@@ -1,0 +1,101 @@
+# Transmissão contínua no RS485 — ESP8266 (ESP-12)
+#
+# Serve para medir o barramento com um multímetro. O firmware de Modbus envia
+# tramas de 8 bytes a cada 15 s, ou seja menos de 1 ms de atividade em cada
+# segundo: o multímetro nunca apanha nada. Aqui a UART despeja 80 bytes 0x00
+# a cada 100 ms, o que satura a linha e dá uma leitura estável.
+#
+# FAZ ESTE TESTE COM O RJ45 FORA DO INVERSOR. Uma linha saturada bloquearia o
+# barramento do Deye enquanto o teste corre.
+#
+# Porque 0x00: cada byte fica 9 dos 10 tempos de bit no estado "0", por isso o
+# diferencial A-B assenta numa polaridade só, em vez de se anular na média.
+#
+# Mede em tensão contínua, entre o A e o B do terminal:
+#
+#   Cerca de 0,5 V a 1,2 V (ou negativo, se tiveres as pontas ao contrário)
+#     O transcetor está a atacar o barramento. O módulo está bom, e o problema
+#     está no inversor ou no cabo.
+#
+#   0,00 V, ou uns poucos mV
+#     O emissor nunca liga. Ou o chip não está alimentado — mede os 5 V no
+#     próprio SP485EEN, entre o pino 8 e o pino 5 — ou o circuito de controlo
+#     de direção não comuta com os 3,3 V do ESP. Nenhum dos dois se resolve
+#     por software: é preciso 12 V no terminal, ou outro módulo com pino DE.
+#
+# O valor é uma média: a linha só está atacada 42% do tempo, por isso não
+# esperes os 2 V de um barramento permanentemente ocupado. O que importa é
+# ser claramente diferente de zero.
+#
+# Contra o GND, espera cerca de 40% da tensão de pico no A e quase nada no B.
+# É normal: a média inclui os 58% do tempo em que o emissor está desligado e
+# as duas linhas flutuam. Dividir o A-B por 0,42 dá o diferencial de pico.
+
+substitutions:
+  # ---- PREENCHE ISTO ANTES DE GRAVAR ----
+  api_key: COLA-AQUI-A-CHAVE-BASE64
+  wifi_ssid_1: Vodafone-18BB87
+  wifi_password_1: muda-esta-password
+  wifi_ssid_2: Vodafone-755A88
+  wifi_password_2: muda-esta-password
+  fallback_password: muda-esta-password
+
+esphome:
+  name: deye-inverter
+  friendly_name: Deye Inverter
+
+esp8266:
+  board: esp12e
+
+logger:
+  baud_rate: 0
+  level: INFO
+  logs:
+    wifi: INFO
+    api: INFO
+
+api:
+  encryption:
+    key: ${api_key}
+
+ota:
+  - platform: esphome
+    encryption: {}
+
+wifi:
+  networks:
+    - ssid: ${wifi_ssid_1}
+      password: ${wifi_password_1}
+    - ssid: ${wifi_ssid_2}
+      password: ${wifi_password_2}
+  ap:
+    ssid: "Deye Inverter Fallback Hotspot"
+    password: ${fallback_password}
+
+captive_portal:
+
+uart:
+  id: uart_bus
+  tx_pin: GPIO1 # fio branco → DI do módulo RS485
+  rx_pin: GPIO3 # fio amarelo ← RO do módulo RS485
+  baud_rate: 9600
+  stop_bits: 1
+
+# 40 bytes a 9600 baud ocupam ~42 ms: a linha fica atacada ~42% do tempo.
+# Nao aumentes este valor. Acima de ~60 bytes por cada 100 ms a UART enche
+# mais depressa do que drena, o uart.write passa a bloquear e o watchdog
+# reinicia o ESP em ciclo, o que o deixa inacessivel em safe mode.
+interval:
+  - interval: 100ms
+    then:
+      - uart.write:
+          id: uart_bus
+          data:
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00
+
+  - interval: 10s
+    then:
+      - logger.log: "A transmitir 0x00 em continuo - mede A-B no terminal"

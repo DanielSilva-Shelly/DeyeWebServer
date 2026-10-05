@@ -1,7 +1,15 @@
 # Deye SUN-6K-SG05LP1  →  RS485 (M5Stack, SP485EEN)  →  ESP8266 (ESP-12)  →  ESPHome web_server v3 + dashboard
 #
-# Variante ESP8266 de deye-inverter.yaml (mesmos sensores e nomes). O Modbus ocupa a UART0
-# (GPIO1/GPIO3), por isso não há logs por cabo: vê-os pelo WiFi no painel ESPHome ou com `esphome logs`.
+# Variante autónoma do deye-inverter-esp8266.yaml: não precisa de secrets.yaml nem de
+# Home Assistant. Todos os valores estão nas substitutions abaixo. Para gravar a partir
+# de um portátil, com o ESP ligado por USB:
+#
+#   pip install esphome
+#   esphome run deye-inverter-esp8266-standalone.yaml
+#
+# O Modbus ocupa a UART0 (GPIO1/GPIO3), por isso não há logs por cabo: vê-os pelo WiFi
+# no painel ESPHome ou com `esphome logs deye-inverter-esp8266-standalone.yaml`.
+# Desliga o fio do RO (GPIO3) enquanto gravas por cabo.
 #
 # Mapa de registos: Deye Modbus protocol V118, híbrido monofásico SG0*LP1
 # (o mesmo usado pelo ha-solarman em deye_hybrid.yaml).
@@ -15,6 +23,20 @@ substitutions:
   friendly_name: Deye Inverter
   # Versão do dashboard servida pelo jsDelivr: "main" ou uma tag (ex.: v1.0.0, recomendado)
   dash_version: v1.0.1
+
+  # ---- PREENCHE ISTO ANTES DE GRAVAR ----
+  # Chave da API (igual à do Home Assistant, senão tens de a atualizar lá).
+  # Para gerar uma nova: openssl rand -base64 32
+  api_key: COLA-AQUI-A-CHAVE-BASE64
+  web_password: muda-esta-password      # login do dashboard (utilizador: admin)
+  fallback_password: muda-esta-password # password do AP de recurso (mín. 8 caracteres)
+
+  wifi_ssid_1: Vodafone-18BB87          # Tornada
+  wifi_password_1: muda-esta-password
+  wifi_ssid_2: Vodafone-755A88          # Conventinho
+  wifi_password_2: muda-esta-password
+  wifi_ssid_3: SSID-DA-CASA-DO-PAI      # rede nova — confirma maiúsculas e hífenes
+  wifi_password_3: muda-esta-password
 
 esphome:
   name: ${name}
@@ -31,7 +53,7 @@ logger:
 
 api:
   encryption:
-    key: !secret api_key
+    key: ${api_key}
 
 # Atualizações encriptadas com a chave da API
 ota:
@@ -40,13 +62,15 @@ ota:
 
 wifi:
   networks:
-    - ssid: !secret wifi_ssid_1
-      password: !secret wifi_password_1
-    - ssid: !secret wifi_ssid_2
-      password: !secret wifi_password_2
+    - ssid: ${wifi_ssid_1}
+      password: ${wifi_password_1}
+    - ssid: ${wifi_ssid_2}
+      password: ${wifi_password_2}
+    - ssid: ${wifi_ssid_3}
+      password: ${wifi_password_3}
   ap:
     ssid: "Deye Inverter Fallback"
-    password: !secret fallback_password
+    password: ${fallback_password}
 
 captive_portal:
 
@@ -61,7 +85,7 @@ web_server:
   auth:
     type: digest
     username: admin
-    password: !secret web_password
+    password: ${web_password}
   sorting_groups:
     - id: solar
       name: Solar

@@ -1,0 +1,132 @@
+# Firmware de diagnóstico do barramento RS485 — ESP8266 (ESP-12)
+#
+# Objetivo: responder a uma pergunta só — chega algum byte ao ESP, e em que forma?
+# O bloco `uart: debug:` escreve no log TODOS os bytes que passam na UART0, em hexadecimal:
+#
+#   >>> 01:03:00:B8:00:01:04:2F     o ESP enviou (pedido do SOC, registo 184)
+#   <<< 01:03:02:00:3C:B9:9E        chegou resposta do inversor
+#
+# Como ler o resultado:
+#
+#   Só aparece ">>>", nunca "<<<"
+#     Nada chega ao ESP. O problema está no caminho de receção ou no barramento:
+#     módulo sem alimentação, fios do Grove trocados, A/B trocados, porta errada
+#     no inversor, ou o inversor não responde neste endereço.
+#
+#   Aparece ">>>" e um "<<<" igual ao ">>>"
+#     É o eco do próprio envio. Ótima notícia: a UART, os pinos e o módulo
+#     funcionam nos dois sentidos. Falta só o inversor responder — foca-te na
+#     porta do Deye, na polaridade A/B e no endereço Modbus.
+#
+#   Aparece "<<<" diferente do ">>>", mas o modbus_controller dá erro
+#     Há comunicação. É CRC, baud rate ou registo errado.
+#
+#   Não aparece nem ">>>"
+#     A UART não está a enviar. Confirma que o firmware é este e que o logger
+#     tem baud_rate: 0 (senão a UART0 está ocupada pelos logs).
+#
+# Teste de loopback (isola o ESP do resto, 2 minutos):
+#   Desliga os fios branco e amarelo do módulo e põe um jumper entre o GPIO1 e
+#   o GPIO3. Cada ">>>" tem de aparecer logo como "<<<" igual. Se aparecer, o
+#   ESP e a configuração estão bons e o problema é do módulo ou do barramento.
+#   Se não aparecer, o problema está no ESP ou nos pinos.
+#
+# Gravar e ver os logs, com o ESP ligado por USB (desliga o fio do RO/GPIO3 antes):
+#   pip install esphome
+#   esphome run esphome/deye-debug-rs485.yaml
+#
+# Já em rede, basta:
+#   esphome logs esphome/deye-debug-rs485.yaml
+#
+# Este firmware não tem web_server: pede um registo só, de 15 em 15 s, para o
+# log ficar legível e não sobrecarregar o ESP8266 com logs por WiFi.
+
+substitutions:
+  # ---- PREENCHE ISTO ANTES DE GRAVAR ----
+  api_key: COLA-AQUI-A-CHAVE-BASE64 # a mesma do Home Assistant; nova: openssl rand -base64 32
+
+  wifi_ssid_1: Vodafone-18BB87
+  wifi_password_1: muda-esta-password
+  wifi_ssid_2: Vodafone-755A88
+  wifi_password_2: muda-esta-password
+  fallback_password: muda-esta-password
+
+esphome:
+  name: deye-debug
+  friendly_name: Deye Debug RS485
+
+esp8266:
+  board: esp12e
+
+# baud_rate 0 é obrigatório: liberta a UART0 para o RS485. Os logs vão por WiFi.
+# DEBUG basta: o dump da UART mostra qualquer byte recebido, mesmo corrompido ou
+# descartado pelo Modbus. VERBOSE global não compensa no ESP8266 — gera tantos
+# logs por WiFi que o próprio ESP fica instável e pode reiniciar.
+logger:
+  baud_rate: 0
+  level: DEBUG
+  logs:
+    uart_debug: DEBUG
+    modbus: DEBUG
+    modbus_controller: DEBUG
+    wifi: INFO
+    api: INFO
+    api.connection: INFO
+
+api:
+  encryption:
+    key: ${api_key}
+
+ota:
+  - platform: esphome
+    encryption: {}
+
+wifi:
+  networks:
+    - ssid: ${wifi_ssid_1}
+      password: ${wifi_password_1}
+    - ssid: ${wifi_ssid_2}
+      password: ${wifi_password_2}
+  ap:
+    ssid: "Deye Debug Fallback"
+    password: ${fallback_password}
+
+captive_portal:
+
+uart:
+  id: uart_bus
+  tx_pin: GPIO1 # fio branco → DI do módulo RS485
+  rx_pin: GPIO3 # fio amarelo ← RO do módulo RS485
+  baud_rate: 9600
+  stop_bits: 1
+  # Despeja em hexadecimal tudo o que passa na UART, nos dois sentidos.
+  # timeout 20ms agrupa cada trama Modbus numa linha só.
+  debug:
+    direction: BOTH
+    dummy_receiver: false
+    after:
+      timeout: 20ms
+      bytes: 64
+
+modbus:
+  id: modbus_bus
+  uart_id: uart_bus
+
+modbus_controller:
+  - id: deye
+    address: 1 # endereço do inversor; o Deye usa 1 por defeito
+    modbus_id: modbus_bus
+    update_interval: 15s
+    max_cmd_retries: 1 # menos repetições no log
+
+sensor:
+  # Registo 184 = SOC da bateria, o mais seguro para testar.
+  # Trama esperada:  >>> 01:03:00:B8:00:01:04:2F
+  - platform: modbus_controller
+    modbus_controller_id: deye
+    name: "Teste SOC"
+    register_type: holding
+    address: 184
+    value_type: U_WORD
+    unit_of_measurement: "%"
+    accuracy_decimals: 0
