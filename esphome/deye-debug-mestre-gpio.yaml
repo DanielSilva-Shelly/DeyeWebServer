@@ -1,0 +1,140 @@
+# Mestre Modbus por software, sem usar o emissor do módulo — ESP8266 (ESP-12)
+#
+# Testa a hipótese de o módulo não libertar o barramento a tempo.
+#
+# O circuito de direção automática do Unit RS485 decide quando transmitir a
+# partir do sinal do DI e mantém o emissor ligado algum tempo depois do último
+# byte, fixado por um RC que não se pode observar nem ajustar. O inversor
+# responde em poucos milissegundos. Se o emissor ainda estiver a atacar a linha
+# nesse instante, a resposta é destruída na própria linha e não chega nada —
+# nem uma trama corrompida, porque o nosso sinal a esmaga.
+#
+# Este firmware salta o emissor do módulo por completo:
+#
+#   - Dois GPIO atacam o A e o B em antifase e escrevem a trama Modbus por
+#     software, a 9600 baud, com bits de start e de stop.
+#   - Logo após o último bit, os dois pinos passam a INPUT, ou seja alta
+#     impedância. O barramento fica livre em microssegundos, não em
+#     milissegundos.
+#   - O recetor do módulo continua a ouvir, e o RO entrega a resposta à UART.
+#
+# O módulo passa a ser só um recetor, que é a parte dele que está provada boa.
+#
+# LIGAÇÃO (RJ45 LIGADO ao inversor, porta Modbus):
+#
+#   GPIO4  → terminal A        jumper
+#   GPIO5  → terminal B        jumper
+#   GPIO3  ← fio amarelo (RO)  como está
+#   GND    ← fio preto         como está
+#   fio branco (DI)            DESLIGADO do GPIO1
+#
+# RISCO A ACEITAR: enquanto os pinos estão em INPUT, o GPIO4 e o GPIO5 ficam
+# expostos ao barramento. Um emissor RS485 oscila tipicamente entre 1 V e 4 V,
+# dentro do que os díodos de proteção do ESP aguentam, e é a mesma exposição que
+# o GPIO3 teve durante todo o diagnóstico sem se degradar. Mas é exposição fora
+# de especificação: não deixes isto a correr permanentemente.
+#
+# O que esperar, de 5 em 5 segundos:
+#
+#   [mestre]: pedido enviado, barramento libertado
+#   <<< 01:03:02:00:3C:B9:9E     ← o inversor respondeu. Hipótese confirmada.
+#
+# Sete bytes a começar por 01:03 é a resposta. Se aparecer, o problema era o
+# tempo de libertação do módulo, e a correção definitiva é um módulo com o pino
+# DE acessível e o flow_control_pin do componente modbus.
+#
+# Se continuar silencioso nas duas polaridades do A/B, então o teu lado está
+# esgotado por completo e o assunto é da porta do inversor.
+
+substitutions:
+  # ---- PREENCHE ISTO ANTES DE GRAVAR ----
+  api_key: COLA-AQUI-A-CHAVE-BASE64
+  wifi_ssid_1: Vodafone-18BB87
+  wifi_password_1: muda-esta-password
+  wifi_ssid_2: Vodafone-755A88
+  wifi_password_2: muda-esta-password
+  fallback_password: muda-esta-password
+
+esphome:
+  name: deye-inverter
+  friendly_name: Deye Inverter
+  on_boot:
+    priority: -100
+    then:
+      - lambda: |-
+          // Em repouso os pinos ficam em alta impedância: o barramento é do inversor.
+          pinMode(4, INPUT);
+          pinMode(5, INPUT);
+
+esp8266:
+  board: esp12e
+
+logger:
+  baud_rate: 0
+  level: DEBUG
+  logs:
+    uart_debug: DEBUG
+    wifi: INFO
+    api: INFO
+    api.connection: INFO
+
+api:
+  encryption:
+    key: ${api_key}
+
+ota:
+  - platform: esphome
+    encryption: {}
+
+wifi:
+  networks:
+    - ssid: ${wifi_ssid_1}
+      password: ${wifi_password_1}
+    - ssid: ${wifi_ssid_2}
+      password: ${wifi_password_2}
+  ap:
+    ssid: "Deye Inverter Fallback Hotspot"
+    password: ${fallback_password}
+
+captive_portal:
+
+# Só rx_pin: a transmissão é feita por software nos GPIO4 e GPIO5.
+uart:
+  id: uart_bus
+  rx_pin: GPIO3
+  baud_rate: 9600
+  stop_bits: 1
+  debug:
+    direction: BOTH
+    dummy_receiver: true
+    after:
+      timeout: 50ms
+      bytes: 64
+
+interval:
+  - interval: 5s
+    then:
+      - lambda: |-
+          // Pedido do registo 184 (SOC). CRC já calculado.
+          static const uint8_t frame[8] = {0x01, 0x03, 0x00, 0xB8, 0x00, 0x01, 0x04, 0x2F};
+          pinMode(4, OUTPUT);
+          pinMode(5, OUTPUT);
+          digitalWrite(4, HIGH); digitalWrite(5, LOW);     // marca
+          delayMicroseconds(2000);                          // silêncio antes da trama
+          for (uint8_t n = 0; n < 8; n++) {
+            uint8_t v = frame[n];
+            digitalWrite(4, LOW); digitalWrite(5, HIGH);    // start
+            delayMicroseconds(104);
+            for (uint8_t b = 0; b < 8; b++) {               // 8 bits, LSB primeiro
+              bool bit = (v >> b) & 1;
+              digitalWrite(4, bit);
+              digitalWrite(5, !bit);
+              delayMicroseconds(104);
+            }
+            digitalWrite(4, HIGH); digitalWrite(5, LOW);    // stop
+            delayMicroseconds(104);
+          }
+          // Liberta o barramento imediatamente: é isto que o módulo não faz.
+          pinMode(4, INPUT);
+          pinMode(5, INPUT);
+          ESP_LOGI("mestre", "pedido enviado, barramento libertado");
