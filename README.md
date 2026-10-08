@@ -184,6 +184,43 @@ O estado passa a "Sem leituras do inversor". O ESP está ligado e a enviar os se
    - `Modbus error function code: 0x3 register … exception: 2`: o endereço do registo não existe neste modelo. Confirma que usas os endereços da tabela acima (decimais, por exemplo `184`) e não os de outros modelos.
 4. Se os valores chegarem mas parecerem absurdos (SOC acima de 100, potências enormes), o registo está errado ou o sinal está trocado: compara com a app Solarman.
 
+### Módulo MAX485 com DE e RE
+
+Os módulos de quatro pinos no Grove (como o M5Stack Unit RS485 / U034) comutam a direção do barramento sozinhos, com um circuito RC a partir do sinal do DI. Não se observa nem se controla, e o instante em que largam o barramento depois de transmitir é a única variável que fica invisível. Um módulo que exponha o **DE** e o **RE** resolve isso: o ESPHome passa a decidir quando transmite.
+
+Ligação de produção, com o módulo a 3,3 V:
+
+```
+VCC → 3V3 do ESP        DI → GPIO1
+GND → GND               RO → GPIO3
+DE + RE juntos → GPIO5
+A / B → borne verde → pinos 7 e 8 do RJ45 (GND do cabo no pino 3)
+```
+
+Alimentar a 3,3 V é o caminho mais simples: o RO passa a sair a 3,3 V e não precisas de divisor nenhum no RX. O MAX485 é especificado para 5 V, mas funciona bem a 3,3 V num barramento curto como este. Se preferires os 5 V, põe **1 kΩ em série no RO**, ou um divisor **1 kΩ + 2 kΩ** — qualquer par em que a segunda resistência seja grosso modo o dobro da primeira serve.
+
+No YAML basta a linha do `flow_control_pin`, já ativa nos ficheiros de produção:
+
+```yaml
+modbus:
+  id: modbus_bus
+  uart_id: uart_bus
+  flow_control_pin: GPIO5
+```
+
+#### Teste de bancada, sem inversor
+
+Antes de levares o conjunto para o inversor, valida o módulo em cima da mesa com o `esphome/deye-debug-max485.yaml`. Liga tudo como acima mas com o **RE ao GND** em vez do GPIO5, e deixa o A e o B no ar, sem cabo. Com o recetor sempre ligado, o módulo ouve o próprio emissor e o eco aparece no log:
+
+```
+>>> 01:03:00:B8:00:01:04:2F
+<<< 01:03:00:B8:00:01:04:2F     igual: emissor, recetor e UART todos bons
+```
+
+É o teste mais completo que consegues fazer sem o inversor: cobre de uma vez os passos 1 a 5 da escada abaixo. Se só aparecer o `>>>`, confirma o RE no GND e depois troca de módulo.
+
+> ⚠️ O RE no GND é **só** para este teste. Em produção tem de ir ao GPIO5 junto com o DE, senão o ESP recebe o eco das próprias perguntas e o Modbus tenta interpretá-lo como resposta do inversor.
+
 ### Escada de diagnóstico
 
 Pela ordem que separa mais depressa o problema. Cada passo isola uma parte e os firmwares de apoio estão todos em `esphome/`.

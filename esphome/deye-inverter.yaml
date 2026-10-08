@@ -86,11 +86,13 @@ uart:
 modbus:
   id: modbus_bus
   uart_id: uart_bus
-  # Com um módulo RS485 que exponha o DE (por exemplo MAX3485), liga o DE e o RE
-  # juntos a um GPIO livre e descomenta a linha abaixo. Fica HIGH enquanto o ESP
-  # transmite. Preferível ao controlo de direção automático dos módulos de 4 pinos,
-  # que é desenhado para lógica de 5 V e não se consegue observar nem controlar.
-  # flow_control_pin: GPIO5
+  # Controlo de direção do módulo MAX485: liga o DE e o RE juntos ao GPIO5. Fica
+  # HIGH enquanto o ESP transmite e volta a LOW logo que acaba, libertando o
+  # barramento para a resposta do inversor. Preferível ao controlo automático dos
+  # módulos de 4 pinos (como o M5Stack U034), que é desenhado para lógica de 5 V e
+  # não se consegue observar nem controlar.
+  # Se usares um módulo de 4 pinos, sem DE, comenta a linha abaixo.
+  flow_control_pin: GPIO5
 
 modbus_controller:
   # Potências e SOC: o que o dashboard anima em tempo real
