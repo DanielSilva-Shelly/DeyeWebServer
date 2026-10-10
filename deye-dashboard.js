@@ -38,6 +38,7 @@
       bat: "Potência da Bateria",
       grid: "Potência da Rede",
       load: "Consumo da Casa",
+      ups: "Saída LOAD",
       ePv: "Produção Solar Hoje",
       eLoad: "Consumo Hoje",
       eBuy: "Energia Comprada Hoje",
@@ -264,6 +265,7 @@
         kv("sBat", "Bateria", "sBat") +
         kv("sTemp", "Temperaturas", "sTemp") +
         kv("sPv", "Tensão das strings", "sPv") +
+        kv("sUps", "Saída LOAD (UPS)", "sUps") +
         "</dl></section></div>" +
         '<footer class="dd-foot"><button type="button" class="dd-btn" data-f="toggle" aria-expanded="false">Mostrar painel ESPHome</button>' +
         '<span data-f="last"></span></footer></div>'
@@ -492,6 +494,11 @@
     });
     row("sPv", has("vPv1") || has("vPv2"), function () {
       set("sPv", join([has("vPv1") && "PV1 " + nf0.format(val.vPv1) + " V", has("vPv2") && "PV2 " + nf0.format(val.vPv2) + " V"]));
+    });
+    // Potência que sai pelos bornes LOAD. Está incluída no "Consumo da Casa"
+    // (registo 178), por isso mostra-se também o resto da casa, que é a diferença.
+    row("sUps", has("ups"), function () {
+      set("sUps", join([nf0.format(val.ups) + " W", has("load") && "resto da casa " + nf0.format(val.load - val.ups) + " W"]));
     });
     show("sys", any);
   }
