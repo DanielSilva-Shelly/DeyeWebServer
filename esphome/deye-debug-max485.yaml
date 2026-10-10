@@ -1,0 +1,131 @@
+# Teste de bancada do módulo MAX485 — ESP8266 (ESP-12)
+#
+# Serve para validar o módulo NOVO (o que tem os pinos DI / DE / RE / RO) em
+# casa, SEM inversor e SEM cabo de rede ligado a nada. Prova, numa só linha de
+# log, que o emissor, o recetor e os dois pinos da UART estão todos bons.
+#
+# Como funciona: o RE fica ligado permanentemente ao GND, por isso o recetor do
+# módulo nunca se desliga. Quando o ESP transmite, o emissor põe os bits no A/B
+# e o recetor do mesmo módulo lê-os de volta. O eco aparece no log:
+#
+#   >>> 01:03:00:B8:00:01:04:2F
+#   <<< 01:03:00:B8:00:01:04:2F     <- igual: módulo 100% bom
+#
+# O RE no GND é também a ligação de produção. Ligar o RE ao GPIO5 junto com o DE
+# desliga o recetor e faz perder as respostas do inversor, que chegam cerca de
+# 30 ms depois do pedido. O eco que o ESP recebe de si próprio é descartado pelo
+# ESPHome sem fazer mal nenhum.
+#
+# Ligações para o teste (nada ligado ao inversor):
+#
+#   VCC → 3V3 do ESP          DI → GPIO1
+#   GND → GND                 RO → GPIO3
+#   DE  → GPIO5               RE → GND
+#   A e B → deixa no ar, sem cabo
+#
+# Como ler o resultado:
+#
+#   >>> seguido de <<< igual
+#     Módulo bom, pinos bons, UART boa. Passa à produção sem mexer nos fios:
+#     grava o deye-inverter-esp8266.yaml.
+#
+#   Só >>>, nunca <<<
+#     Confirma que o RE está mesmo no GND e o DE no GPIO5. Se estiver certo,
+#     troca de módulo — vieram dois na embalagem.
+#
+#   <<< com bytes diferentes do >>>
+#     O eco está a chegar corrompido. Quase sempre é o VCC: confirma que está
+#     nos 3V3 e não a flutuar.
+#
+#   Lixo constante no <<< sem o ESP ter enviado nada
+#     Normal nos intervalos: com o A/B no ar e o recetor sempre ligado, a
+#     entrada flutua. Interessa-te só a linha que vem logo depois do >>>.
+#
+# Gravar: cria um ficheiro novo no add-on do ESPHome, preenche a api_key e as
+# redes, e instala.
+
+substitutions:
+  # ---- PREENCHE ISTO ANTES DE GRAVAR ----
+  api_key: COLA-AQUI-A-CHAVE-BASE64
+  wifi_ssid_1: Vodafone-18BB87
+  wifi_password_1: muda-esta-password
+  wifi_ssid_2: Vodafone-755A88
+  wifi_password_2: muda-esta-password
+  fallback_password: muda-esta-password
+
+esphome:
+  name: deye-debug
+  friendly_name: Deye Debug MAX485
+
+esp8266:
+  board: esp12e
+
+# baud_rate 0 é obrigatório: liberta o GPIO1 e o GPIO3 para o RS485.
+logger:
+  baud_rate: 0
+  level: DEBUG
+  logs:
+    uart_debug: DEBUG
+    modbus: DEBUG
+    modbus_controller: DEBUG
+    wifi: INFO
+    api: INFO
+    api.connection: INFO
+
+api:
+  encryption:
+    key: ${api_key}
+
+ota:
+  - platform: esphome
+    password: ${fallback_password}
+
+wifi:
+  networks:
+    - ssid: ${wifi_ssid_1}
+      password: ${wifi_password_1}
+    - ssid: ${wifi_ssid_2}
+      password: ${wifi_password_2}
+  ap:
+    ssid: "Deye Debug Fallback"
+    password: ${fallback_password}
+
+captive_portal:
+
+uart:
+  id: uart_bus
+  tx_pin: GPIO1 # → DI do módulo
+  rx_pin: GPIO3 # ← RO do módulo
+  baud_rate: 9600
+  stop_bits: 1
+  debug:
+    direction: BOTH
+    dummy_receiver: false
+    after:
+      timeout: 20ms
+      bytes: 64
+
+modbus:
+  id: modbus_bus
+  uart_id: uart_bus
+  # É este pino que faltava no M5Stack: vai a HIGH enquanto o ESP transmite e
+  # volta a LOW logo que acaba, libertando o barramento para a resposta.
+  flow_control_pin: GPIO5
+
+modbus_controller:
+  - id: deye
+    address: 1
+    modbus_id: modbus_bus
+    update_interval: 15s
+    max_cmd_retries: 1
+
+sensor:
+  # Registo 184 = SOC da bateria. Trama esperada: 01:03:00:B8:00:01:04:2F
+  - platform: modbus_controller
+    modbus_controller_id: deye
+    name: "Teste SOC"
+    register_type: holding
+    address: 184
+    value_type: U_WORD
+    unit_of_measurement: "%"
+    accuracy_decimals: 0

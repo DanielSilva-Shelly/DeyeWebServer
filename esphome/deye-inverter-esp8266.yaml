@@ -89,11 +89,16 @@ uart:
 modbus:
   id: modbus_bus
   uart_id: uart_bus
-  # Com um módulo RS485 que exponha o DE (por exemplo MAX3485), liga o DE e o RE
-  # juntos a um GPIO livre e descomenta a linha abaixo. Fica HIGH enquanto o ESP
-  # transmite. Preferível ao controlo de direção automático dos módulos de 4 pinos,
-  # que é desenhado para lógica de 5 V e não se consegue observar nem controlar.
-  # flow_control_pin: GPIO5
+  # Controlo de direção do módulo MAX485: só o DE vai ao GPIO5. Fica HIGH enquanto
+  # o ESP transmite e volta a LOW logo que acaba, libertando o barramento.
+  #
+  # IMPORTANTE: o RE liga ao GND, NÃO ao GPIO5 junto com o DE. Ligado ao GPIO5 o
+  # recetor fica desligado e as respostas do inversor perdem-se — foi exatamente
+  # isso que manteve este projeto sem dados. Com o RE no GND o recetor está sempre
+  # à escuta e o ESP recebe o eco do próprio envio, que o ESPHome descarta sozinho
+  # ("Clearing buffer of N bytes - parse failed") antes de ler a resposta real.
+  # Se usares um módulo de 4 pinos, sem DE, comenta a linha abaixo.
+  flow_control_pin: GPIO5
 
 modbus_controller:
   # Potências e SOC: o que o dashboard anima em tempo real
