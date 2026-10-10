@@ -193,9 +193,11 @@ Ligação de produção, com o módulo a 3,3 V:
 ```
 VCC → 3V3 do ESP        DI → GPIO1
 GND → GND               RO → GPIO3
-DE + RE juntos → GPIO5
+DE  → GPIO5             RE → GND
 A / B → borne verde → pinos 7 e 8 do RJ45 (GND do cabo no pino 3)
 ```
+
+> ⚠️ **O RE vai ao GND, não ao GPIO5.** É o detalhe que decidiu este projeto. Com o RE ligado ao GPIO5 junto com o DE, o recetor fica desligado enquanto o ESP transmite e as respostas do inversor — que chegam cerca de 30 ms depois do pedido — nunca aparecem. Com o RE no GND o recetor está sempre à escuta: o ESP recebe o eco do próprio envio, o ESPHome descarta-o sozinho (`Clearing buffer of N bytes - parse failed`) e lê a resposta verdadeira logo a seguir. Esse aviso no log é normal e inofensivo; a linha `Sensor new state` vem sempre a seguir.
 
 Alimentar a 3,3 V é o caminho mais simples: o RO passa a sair a 3,3 V e não precisas de divisor nenhum no RX. O MAX485 é especificado para 5 V, mas funciona bem a 3,3 V num barramento curto como este. Se preferires os 5 V, põe **1 kΩ em série no RO**, ou um divisor **1 kΩ + 2 kΩ** — qualquer par em que a segunda resistência seja grosso modo o dobro da primeira serve.
 
@@ -210,7 +212,7 @@ modbus:
 
 #### Teste de bancada, sem inversor
 
-Antes de levares o conjunto para o inversor, valida o módulo em cima da mesa com o `esphome/deye-debug-max485.yaml`. Liga tudo como acima mas com o **RE ao GND** em vez do GPIO5, e deixa o A e o B no ar, sem cabo. Com o recetor sempre ligado, o módulo ouve o próprio emissor e o eco aparece no log:
+Para validar o módulo em cima da mesa com o `esphome/deye-debug-max485.yaml`: liga tudo como acima e deixa o A e o B no ar, sem cabo. Com o recetor sempre ligado, o módulo ouve o próprio emissor e o eco aparece no log:
 
 ```
 >>> 01:03:00:B8:00:01:04:2F
@@ -219,7 +221,13 @@ Antes de levares o conjunto para o inversor, valida o módulo em cima da mesa co
 
 É o teste mais completo que consegues fazer sem o inversor: cobre de uma vez os passos 1 a 5 da escada abaixo. Se só aparecer o `>>>`, confirma o RE no GND e depois troca de módulo.
 
-> ⚠️ O RE no GND é **só** para este teste. Em produção tem de ir ao GPIO5 junto com o DE, senão o ESP recebe o eco das próprias perguntas e o Modbus tenta interpretá-lo como resposta do inversor.
+Com o inversor ligado, o mesmo log passa a mostrar o eco e a resposta na mesma linha:
+
+```
+>>> 01:03:00:B8:00:01:04:2F
+<<< 01:03:00:B8:00:01:04:2F:01:03:02:00:34:B9:93
+    \_______ eco ________/\____ resposta ____/   SOC = 0x34 = 52 %
+```
 
 ### Escada de diagnóstico
 

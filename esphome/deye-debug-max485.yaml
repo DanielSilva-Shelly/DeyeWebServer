@@ -11,9 +11,10 @@
 #   >>> 01:03:00:B8:00:01:04:2F
 #   <<< 01:03:00:B8:00:01:04:2F     <- igual: módulo 100% bom
 #
-# ATENÇÃO: esta ligação do RE é SÓ para este teste. No firmware de produção o
-# RE tem de ir junto com o DE ao GPIO5, senão o ESP recebe o eco das próprias
-# perguntas e o Modbus tenta interpretá-lo como resposta do inversor.
+# O RE no GND é também a ligação de produção. Ligar o RE ao GPIO5 junto com o DE
+# desliga o recetor e faz perder as respostas do inversor, que chegam cerca de
+# 30 ms depois do pedido. O eco que o ESP recebe de si próprio é descartado pelo
+# ESPHome sem fazer mal nenhum.
 #
 # Ligações para o teste (nada ligado ao inversor):
 #
@@ -25,8 +26,8 @@
 # Como ler o resultado:
 #
 #   >>> seguido de <<< igual
-#     Módulo bom, pinos bons, UART boa. Passa à produção: liga o RE ao GPIO5
-#     junto com o DE e grava o deye-inverter-esp8266.yaml.
+#     Módulo bom, pinos bons, UART boa. Passa à produção sem mexer nos fios:
+#     grava o deye-inverter-esp8266.yaml.
 #
 #   Só >>>, nunca <<<
 #     Confirma que o RE está mesmo no GND e o DE no GPIO5. Se estiver certo,
