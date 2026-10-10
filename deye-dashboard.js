@@ -39,6 +39,7 @@
       grid: "Potência da Rede",
       load: "Consumo da Casa",
       ups: "Saída LOAD",
+      gen: "Potência do Gerador",
       ePv: "Produção Solar Hoje",
       eLoad: "Consumo Hoje",
       eBuy: "Energia Comprada Hoje",
@@ -66,6 +67,8 @@
     bat: "M16 20H8V6H16M16.67 4H15V2H9V4H7.33C6.6 4 6 4.6 6 5.33V20.67C6 21.4 6.6 22 7.33 22H16.67C17.41 22 18 21.41 18 20.67V5.33C18 4.6 17.4 4 16.67 4M15 16H9V19H15V16M15 7H9V10H15V7M15 11.5H9V14.5H15V11.5Z",
     grid: "M8.28,5.45L6.5,4.55L7.76,2H16.23L17.5,4.55L15.72,5.44L15,4H9L8.28,5.45M18.62,8H14.09L13.3,5H10.7L9.91,8H5.38L4.1,10.55L5.89,11.44L6.62,10H17.38L18.1,11.45L19.89,10.56L18.62,8M17.77,22H15.7L15.46,21.1L12,15.9L8.53,21.1L8.3,22H6.23L9.12,11H11.19L10.83,12.35L12,14.1L13.16,12.35L12.81,11H14.88L17.77,22M11.4,15L10.5,13.65L9.32,18.13L11.4,15M14.68,18.12L13.5,13.64L12.6,15L14.68,18.12Z",
     home: "M10,20V14H14V20H19V12H22L12,3L2,12H5V20H10Z",
+    plug: "M16,7V3H14V7H10V3H8V7H8C7,7 6,8 6,9V14.5L9.5,18V21H14.5V18L18,14.5V9C18,8 17,7 16,7Z",
+    gen: "M12,2A3,3 0 0,1 15,5V7H18A2,2 0 0,1 20,9V19A2,2 0 0,1 18,21H6A2,2 0 0,1 4,19V9A2,2 0 0,1 6,7H9V5A3,3 0 0,1 12,2M12,4A1,1 0 0,0 11,5V7H13V5A1,1 0 0,0 12,4M12,10A4,4 0 0,0 8,14A4,4 0 0,0 12,18A4,4 0 0,0 16,14A4,4 0 0,0 12,10Z",
     bolt: "M11 15H6L13 1V9H18L11 23V15Z",
     alert:
       "M11,15H13V17H11V15M11,7H13V13H11V7M12,2C6.47,2 2,6.5 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20Z",
@@ -224,23 +227,37 @@
         kv("hPeak", "Pico nesta sessão") +
         "</dl></section>" +
         '<section class="dd-card dd-flow-card" aria-label="Fluxo de energia">' +
-        '<svg class="dd-flow" viewBox="0 0 340 300" role="img" data-f="flow">' +
+        // O ramo de cima e o de baixo dividem-se em dois quando há gerador ou
+        // saída LOAD: os nós afastam-se 56 para cada lado e os traços passam a
+        // diagonais. A geometria é trocada em branch(), conforme os sensores.
+        // O viewBox começa em -36 para caber o texto por cima dos nós de topo.
+        '<svg class="dd-flow" viewBox="0 -36 340 366" role="img" data-f="flow">' +
         link("pv", "M170 72V126", "var(--dd-solar)") +
+        link("gen", "M180 74L216 122", "var(--dd-gen)") +
         link("bat", "M76 150H146", "var(--dd-bat)") +
         link("grid", "M264 150H194", "var(--dd-grid)") +
         link("home", "M170 174V228", "var(--dd-home)") +
-        node("pv", 170, 44, "var(--dd-solar)", ICON.solar, "Solar") +
+        link("ups", "M180 176L216 226", "var(--dd-ups)") +
+        '<g data-f="gPv">' + node("pv", 170, 44, "var(--dd-solar)", ICON.solar, "Solar") +
+        '<text x="170" y="2" text-anchor="middle" data-f="fPv">—</text>' +
+        '<text class="lbl" x="170" y="-16" text-anchor="middle">Solar</text></g>' +
+        '<g data-f="gGen" hidden>' + node("gen", 170, 44, "var(--dd-gen)", ICON.gen, "Gerador") +
+        '<text x="170" y="2" text-anchor="middle" data-f="fGen">—</text>' +
+        '<text class="lbl" x="170" y="-16" text-anchor="middle">Gerador</text></g>' +
         node("bat", 48, 150, "var(--dd-bat)", ICON.bat, "Bateria") +
         node("grid", 292, 150, "var(--dd-grid)", ICON.grid, "Rede") +
-        node("home", 170, 256, "var(--dd-home)", ICON.home, "Casa") +
+        '<g data-f="gHome">' + node("home", 170, 256, "var(--dd-home)", ICON.home, "Casa") +
+        '<text x="170" y="302" text-anchor="middle" data-f="fHome">—</text>' +
+        '<text class="lbl" x="170" y="320" text-anchor="middle" data-f="fHomeL">Casa</text></g>' +
+        '<g data-f="gUps" hidden>' + node("ups", 170, 256, "var(--dd-ups)", ICON.plug, "Saída LOAD") +
+        '<text x="170" y="302" text-anchor="middle" data-f="fUps">—</text>' +
+        '<text class="lbl" x="170" y="320" text-anchor="middle">Saída LOAD</text></g>' +
         '<g class="hub"><title>Inversor</title><rect x="146" y="126" width="48" height="48" rx="12"/>' +
         '<path class="ic" transform="translate(158 138)" d="' + ICON.bolt + '"/></g>' +
-        '<text x="208" y="40" data-f="fPv">—</text><text class="lbl" x="208" y="58">Solar</text>' +
         '<text x="48" y="202" text-anchor="middle" data-f="fBat">—</text>' +
         '<text class="lbl" x="48" y="220" text-anchor="middle" data-f="fBatL">Bateria</text>' +
         '<text x="292" y="202" text-anchor="middle" data-f="fGrid">—</text>' +
         '<text class="lbl" x="292" y="220" text-anchor="middle" data-f="fGridL">Rede</text>' +
-        '<text x="208" y="252" data-f="fHome">—</text><text class="lbl" x="208" y="270" data-f="fHomeL">Casa</text>' +
         "</svg></section></div>" +
         '<div class="dd-tiles">' +
         tile("pv", "Solar", "var(--dd-solar)", ICON.solar) +
@@ -348,6 +365,32 @@
     g.classList.toggle("is-rev", on && w < 0);
     if (on) g.style.setProperty("--dur", speed(Math.abs(w)) + "s");
   }
+  function setLink(id, d) {
+    var g = ui.links[id];
+    if (!g || g.getAttribute("data-d") === d) return;
+    g.setAttribute("data-d", d);
+    g.querySelectorAll("path").forEach(function (n) {
+      n.setAttribute("d", d);
+    });
+  }
+  // Abre ou fecha um ramo duplo do diagrama. Fechado, o primeiro nó fica ao
+  // centro com o traço a direito; aberto, os dois afastam-se 56 para cada lado
+  // e os traços passam a diagonais. Só mexe no DOM quando o estado muda, senão
+  // reiniciava a animação dos traços a cada render.
+  var branchOpen = {};
+  function branch(name, a, b, la, lb, solo, splitA, splitB, open) {
+    if (branchOpen[name] === open) return;
+    branchOpen[name] = open;
+    ui[a].setAttribute("transform", open ? "translate(-56 0)" : "translate(0 0)");
+    ui[b].setAttribute("transform", "translate(56 0)");
+    // O grupo nasce com o atributo hidden no markup, para não piscar antes do
+    // primeiro render. Tira-se o atributo e mexe-se no display: só o style
+    // sozinho não chegava, porque a regra [hidden] continuaria a escondê-lo.
+    ui[b].removeAttribute("hidden");
+    ui[b].style.display = open ? "" : "none";
+    setLink(la, open ? splitA : solo);
+    setLink(lb, splitB);
+  }
   function batText(b) {
     if (b == null) return "Sem leitura";
     if (b <= -CFG.idleW) return "A carregar · " + powerTxt(-b);
@@ -379,22 +422,33 @@
     set("hToday", kwh(val.ePv));
     set("hPeak", peak && peak.v >= idle ? powerTxt(peak.v) + " · " + clock(peak.t) : "—");
 
-    // Diagrama
+    // Diagrama. O nó do gerador e o da saída LOAD seguem a app da Deye: só
+    // aparecem quando há mesmo potência a passar por eles.
+    var u = has("ups") && val.ups >= idle ? val.ups : null;
+    var gn = has("gen") && val.gen >= idle ? val.gen : null;
+    var lHome = u != null && l != null ? Math.max(0, l - u) : l;
+    branch("top", "gPv", "gGen", "pv", "gen", "M170 72V126", "M114 72L152 126", "M226 72L188 126", gn != null);
+    branch("bottom", "gHome", "gUps", "home", "ups", "M170 174V228", "M152 174L114 228", "M188 174L226 228", u != null);
     flow("pv", s);
+    flow("gen", gn);
     flow("bat", b);
     flow("grid", g);
-    flow("home", l);
+    flow("home", lHome);
+    flow("ups", u);
+    set("fGen", gn == null ? "—" : powerTxt(gn));
+    set("fUps", u == null ? "—" : powerTxt(u));
     set("fPv", powerTxt(s));
     set("fBat", b == null ? "—" : powerTxt(Math.abs(b)));
     set("fBatL", "Bateria" + (has("soc") ? " · " + nf0.format(val.soc) + " %" : ""));
     set("fGrid", g == null ? "—" : powerTxt(Math.abs(g)));
     set("fGridL", g == null || Math.abs(g) < idle ? "Rede" : g > 0 ? "Rede · compra" : "Rede · venda");
-    set("fHome", loadTxt(l));
-    set("fHomeL", loadMeasured() ? "Casa" : "Casa (estimado)");
+    set("fHome", loadTxt(lHome));
+    set("fHomeL", !loadMeasured() ? "Casa (estimado)" : u != null ? "Casa (sem LOAD)" : "Casa");
     ui.flow.setAttribute(
       "aria-label",
       "Fluxo de energia: solar " + powerTxt(s) + ", bateria " + batText(b).toLowerCase() + ", rede: " + gridText(g).toLowerCase() +
-        (g != null && Math.abs(g) >= idle ? " " + powerTxt(Math.abs(g)) : "") + ", casa " + loadTxt(l)
+        (g != null && Math.abs(g) >= idle ? " " + powerTxt(Math.abs(g)) : "") + ", casa " + loadTxt(lHome) +
+        (u != null ? ", saída LOAD " + powerTxt(u) : "") + (gn != null ? ", gerador " + powerTxt(gn) : "")
     );
 
     // Solar

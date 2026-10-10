@@ -86,6 +86,7 @@ O dashboard identifica as entidades pelo **nome** no YAML. Só as quatro primeir
 | `pv2` | Produção PV2 | 187 | somado à produção solar |
 | `load` | Consumo da Casa | 178 | sem ele o consumo é estimado (solar + bateria + rede) e aparece com "≈" |
 | `ups` | Saída LOAD | 179 | potência nos bornes LOAD, o que a app da Deye mostra como Carga-UPS; já está incluída no 178, por isso o resto da casa é 178 − 179 |
+| `gen` | Potência do Gerador | 166 (a confirmar) | entrada GEN; o sensor vem comentado no YAML, porque o registo só se confirma com um gerador a debitar |
 | `ePv` | Produção Solar Hoje | 108 | ×0,1 kWh |
 | `eLoad` | Consumo Hoje | 84 | ×0,1 kWh |
 | `eBuy` / `eSell` | Energia Comprada / Vendida Hoje | 76 / 77 | ×0,1 kWh |
@@ -230,6 +231,14 @@ Com o inversor ligado, o mesmo log passa a mostrar o eco e a resposta na mesma l
 <<< 01:03:00:B8:00:01:04:2F:01:03:02:00:34:B9:93
     \_______ eco ________/\____ resposta ____/   SOC = 0x34 = 52 %
 ```
+
+### Nós que aparecem e desaparecem
+
+O diagrama de fluxo segue a app da Deye: o nó da **saída LOAD** e o do **gerador** só aparecem quando há mesmo potência a passar por eles. Quando aparecem, o ramo divide-se em dois e os traços passam a diagonais; quando o valor cai abaixo de `idleW`, o nó recolhe-se e o ramo volta a ser uma linha a direito.
+
+Com a saída LOAD visível, o nó da Casa passa a mostrar o **resto da casa** (178 − 179) e a etiqueta muda para "Casa (sem LOAD)", para os dois números somarem o total tal como na app. Os cartões e a autossuficiência continuam a usar o consumo total.
+
+Basta o sensor existir com o nome certo (`Saída LOAD`, `Potência do Gerador`): não há nada a configurar no dashboard.
 
 ### Escada de diagnóstico
 
