@@ -85,6 +85,7 @@ O dashboard identifica as entidades pelo **nome** no YAML. Só as quatro primeir
 | `grid` | Potência da Rede | 169 | **obrigatório**; S_WORD, + compra / − venda |
 | `pv2` | Produção PV2 | 187 | somado à produção solar |
 | `load` | Consumo da Casa | 178 | sem ele o consumo é estimado (solar + bateria + rede) e aparece com "≈" |
+| `ups` | Saída LOAD | 179 | potência nos bornes LOAD, o que a app da Deye mostra como Carga-UPS; já está incluída no 178, por isso o resto da casa é 178 − 179 |
 | `ePv` | Produção Solar Hoje | 108 | ×0,1 kWh |
 | `eLoad` | Consumo Hoje | 84 | ×0,1 kWh |
 | `eBuy` / `eSell` | Energia Comprada / Vendida Hoje | 76 / 77 | ×0,1 kWh |

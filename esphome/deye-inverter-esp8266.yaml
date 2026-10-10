@@ -190,6 +190,13 @@ sensor:
     value_type: S_WORD
     web_server: { sorting_group_id: casa, sorting_weight: 1 }
 
+  - <<: *power
+    name: "Saída LOAD" # potência nos bornes LOAD (UPS); já incluída no registo 178
+    icon: mdi:power-plug
+    address: 179
+    value_type: U_WORD
+    web_server: { sorting_group_id: casa, sorting_weight: 3 }
+
   # ---------- Energia de hoje (60 s; o inversor faz reset à meia-noite) ----------
   - <<: *energy
     name: "Produção Solar Hoje"
