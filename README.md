@@ -94,6 +94,7 @@ O dashboard identifica as entidades pelo **nome** no YAML. Só as quatro primeir
 | `link` | Ligação ao Inversor | — | binary_sensor: o Modbus está a responder |
 | `vGrid` / `fGrid` | Tensão / Frequência da Rede | 150 / 79 | ×0,1 V / ×0,01 Hz |
 | `vBat` / `tBat` | Tensão / Temperatura da Bateria | 183 / 182 | ×0,01 V / (x−1000)×0,1 °C |
+| `iBat` | Corrente da Bateria | — | calculada (potência ÷ tensão), não gasta leituras no Modbus; serve para comparar com o limite do BMS |
 | `tDc` / `tAc` | Temperatura DC / AC do Inversor | 90 / 91 | (x−1000)×0,1 °C |
 | `vPv1` / `vPv2` | Tensão PV1 / PV2 | 109 / 111 | ×0,1 V |
 

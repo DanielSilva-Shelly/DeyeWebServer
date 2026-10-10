@@ -167,6 +167,7 @@ sensor:
     web_server: { sorting_group_id: bateria, sorting_weight: 1 }
 
   - <<: *power
+    id: bateria_w
     name: "Potência da Bateria" # + descarga / − carga
     icon: mdi:battery-charging
     address: 190
@@ -264,6 +265,7 @@ sensor:
     web_server: { sorting_group_id: rede, sorting_weight: 5 }
 
   - <<: *slow
+    id: bateria_v
     name: "Tensão da Bateria"
     address: 183
     value_type: U_WORD
@@ -352,6 +354,26 @@ sensor:
               case 4: return std::string("Falha");
               default: return std::string("Desconhecido");
             }
+
+  # Corrente da bateria, calculada a partir da potência e da tensão que já
+  # lemos: não gasta mais nada no barramento Modbus. O sinal segue a convenção
+  # do Deye (+ descarga / − carga). Serve para comparares com o limite de
+  # corrente do BMS, que os watts sozinhos não deixam ver.
+  - platform: template
+    name: "Corrente da Bateria"
+    icon: mdi:current-dc
+    unit_of_measurement: A
+    device_class: current
+    state_class: measurement
+    accuracy_decimals: 1
+    update_interval: 10s
+    lambda: |-
+      float w = id(bateria_w).state;
+      float v = id(bateria_v).state;
+      // Antes da primeira leitura válida a tensão vem a NaN ou perto de zero:
+      // dividir por ela daria um valor absurdo no arranque.
+      if (std::isnan(w) || std::isnan(v) || v < 10.0f) return NAN;
+      return w / v;
 
   # ---------- Diagnóstico do ESP ----------
   - platform: wifi_signal
