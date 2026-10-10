@@ -50,6 +50,7 @@
       vGrid: "Tensão da Rede",
       fGrid: "Frequência da Rede",
       vBat: "Tensão da Bateria",
+      iBat: "Corrente da Bateria",
       tBat: "Temperatura da Bateria",
       tDc: "Temperatura DC do Inversor",
       tAc: "Temperatura AC do Inversor",
@@ -486,8 +487,8 @@
     row("sGrid", has("vGrid") || has("fGrid"), function () {
       set("sGrid", join([has("vGrid") && nf1.format(val.vGrid) + " V", has("fGrid") && nf2.format(val.fGrid) + " Hz"]));
     });
-    row("sBat", has("vBat") || has("tBat"), function () {
-      set("sBat", join([has("vBat") && nf2.format(val.vBat) + " V", has("tBat") && nf1.format(val.tBat) + " °C"]));
+    row("sBat", has("vBat") || has("iBat") || has("tBat"), function () {
+      set("sBat", join([has("vBat") && nf2.format(val.vBat) + " V", has("iBat") && nf1.format(Math.abs(val.iBat)) + " A", has("tBat") && nf1.format(val.tBat) + " °C"]));
     });
     row("sTemp", has("tDc") || has("tAc"), function () {
       set("sTemp", join([has("tDc") && "DC " + nf1.format(val.tDc) + " °C", has("tAc") && "AC " + nf1.format(val.tAc) + " °C"]));
