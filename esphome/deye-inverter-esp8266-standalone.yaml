@@ -222,6 +222,24 @@ sensor:
     value_type: U_WORD
     web_server: { sorting_group_id: casa, sorting_weight: 3 }
 
+  # Gerador a gasolina na entrada GEN. Descomenta quando o tiveres ligado.
+  #
+  # O registo 166 é o principal suspeito: fica no bloco das potências AC e leu
+  # zero em todas as amostras feitas sem gerador. Mas o 168, 171, 174, 177 e 180
+  # também leram zero, por isso confirma antes de dar como certo: grava o
+  # firmware de varredura, põe o gerador a debitar com alguma carga, e vê qual
+  # dos zeros deixa de ser zero.
+  #
+  # Assim que o sensor existir, o dashboard abre sozinho o nó do gerador no
+  # diagrama, do mesmo modo que faz com a saída LOAD.
+  #
+  # - <<: *power
+  #   name: "Potência do Gerador"
+  #   icon: mdi:engine
+  #   address: 166
+  #   value_type: U_WORD
+  #   web_server: { sorting_group_id: casa, sorting_weight: 4 }
+
   # ---------- Energia de hoje (60 s; o inversor faz reset à meia-noite) ----------
   - <<: *energy
     name: "Produção Solar Hoje"

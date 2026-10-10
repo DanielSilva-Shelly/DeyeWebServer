@@ -27,6 +27,10 @@
   --dd-bat: light-dark(#1baf7a, #199e70);
   --dd-grid: light-dark(#2a78d6, #3987e5);
   --dd-home: var(--dd-ink-2);
+  /* Ramos que só aparecem quando existem: saída LOAD e gerador. Roxo e
+     dourado separam-se bem dos quatro tons acima, incluindo em daltonismo. */
+  --dd-ups: light-dark(#7d4fc9, #9b76e2);
+  --dd-gen: light-dark(#9a6b06, #c99418);
 
   /* Estado (reservado: nunca usado como cor de série) */
   --dd-good: #0ca30c;
@@ -50,6 +54,8 @@
     --dd-solar: #eb6834;
     --dd-bat: #1baf7a;
     --dd-grid: #2a78d6;
+    --dd-ups: #7d4fc9;
+    --dd-gen: #9a6b06;
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -63,6 +69,8 @@
       --dd-solar: #d95926;
       --dd-bat: #199e70;
       --dd-grid: #3987e5;
+      --dd-ups: #9b76e2;
+      --dd-gen: #c99418;
     }
   }
 }
