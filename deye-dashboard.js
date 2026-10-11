@@ -59,6 +59,9 @@
       vBat: "Tensão da Bateria",
       iBat: "Corrente da Bateria",
       cap: "Capacidade da Bateria",
+      pvMes: "Produção Este Mês",
+      loadMes: "Consumo Este Mês",
+      hist: "Histórico Mensal",
       tBat: "Temperatura da Bateria",
       tDc: "Temperatura DC do Inversor",
       tAc: "Temperatura AC do Inversor",
@@ -292,6 +295,12 @@
         kv("sPv", "Tensão das strings", "sPv") +
         kv("sUps", "Saída LOAD (UPS)", "sUps") +
         "</dl></section></div>" +
+        '<section class="dd-card dd-months" data-row="months" hidden aria-label="Produção e consumo por mês">' +
+        '<div class="dd-months-h"><h2 class="dd-h2">Por mês</h2><p class="dd-legend">' +
+        '<span><span class="dd-key" style="--c:var(--dd-solar)"></span>Produção</span>' +
+        '<span><span class="dd-key" style="--c:var(--dd-cons)"></span>Consumo</span></p></div>' +
+        '<div class="dd-mchart"><svg data-f="mchart" role="img"></svg><div class="dd-mtip" data-f="mtip" hidden></div></div>' +
+        '<details class="dd-mtable"><summary>Ver tabela</summary><table data-f="mtable"></table></details></section>' +
         '<footer class="dd-foot"><button type="button" class="dd-btn" data-f="toggle" aria-expanded="false">Mostrar painel ESPHome</button>' +
         '<span data-f="last"></span></footer></div>'
     );
@@ -321,6 +330,7 @@
 
     setupToggle();
     ["pv", "soc", "grid", "load"].forEach(setupSparkHover);
+    setupMonths();
     window.addEventListener("resize", debounce(renderSparks, 150));
   }
 
@@ -447,6 +457,138 @@
     return "cheia em ≈ " + duration(toFull / -bAvg) + amps;
   }
 
+  // ---------- Histórico mensal --------------------------------------------
+  // O ESP publica "AAAAMM;AAAAMM:prod:cons,..." (o primeiro é o mês em curso) e
+  // os dois valores do mês em curso em sensores à parte, que mudam a cada minuto.
+  var MES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+  var monthsKey = "";
+  var monthsData = [];
+  var monthsGeom = { W: 640, L: 44, R: 8 };
+  function kwhShort(v) {
+    return v == null ? "—" : (v < 100 ? nf1 : nf0).format(v) + " kWh";
+  }
+  function monthLabel(ym, withYear) {
+    var m = MES[(ym % 100) - 1] || "?";
+    return withYear ? m + " " + String(Math.floor(ym / 100)).slice(2) : m;
+  }
+  function monthSeries() {
+    if (!has("hist")) return null;
+    var parts = String(val.hist).split(";");
+    var cur = parseInt(parts[0], 10);
+    if (!(cur > 190001)) return null;
+    var map = {};
+    (parts[1] || "").split(",").forEach(function (e) {
+      var f = e.split(":");
+      if (f.length === 3) map[f[0]] = [parseFloat(f[1]), parseFloat(f[2])];
+    });
+    map[cur] = [has("pvMes") ? val.pvMes : null, has("loadMes") ? val.loadMes : null];
+    // Os 12 meses que acabam no mês em curso; começa no primeiro que tem dados.
+    var list = [];
+    for (var i = 11; i >= 0; i--) {
+      var y = Math.floor(cur / 100), m = (cur % 100) - i;
+      while (m < 1) { m += 12; y--; }
+      var ym = y * 100 + m;
+      var d = map[ym];
+      if (d || list.length) list.push({ ym: ym, pv: d ? d[0] : null, ld: d ? d[1] : null, cur: ym === cur });
+    }
+    return list;
+  }
+  function niceMax(v) {
+    if (!(v > 0)) return 10;
+    var p = Math.pow(10, Math.floor(Math.log10(v)));
+    var n = v / p;
+    return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * p;
+  }
+  // Barra com o topo arredondado a 4 e a base direita, assente na linha de base.
+  function barPath(x, y, w, base) {
+    var r = Math.min(4, w / 2, base - y);
+    if (base - y <= 0) return "";
+    return "M" + x + " " + base + "V" + (y + r) + "Q" + x + " " + y + " " + (x + r) + " " + y +
+      "H" + (x + w - r) + "Q" + (x + w) + " " + y + " " + (x + w) + " " + (y + r) + "V" + base + "Z";
+  }
+  function renderMonths() {
+    var list = monthSeries();
+    show("months", !!list);
+    if (!list) return;
+    // Desenha à largura real: com um viewBox fixo, no telemóvel o SVG encolhia
+    // tudo por igual e o texto dos eixos ficava ilegível.
+    var W = Math.max(280, Math.round(ui.mchart.clientWidth || 640));
+    var key = W + JSON.stringify(list);
+    if (key === monthsKey) return;
+    monthsKey = key;
+    monthsData = list;
+
+    var H = 220, L = 44, R = 8, T = 12, B = 30;
+    monthsGeom = { W: W, L: L, R: R };
+    var max = niceMax(Math.max.apply(null, list.map(function (d) { return Math.max(d.pv || 0, d.ld || 0); })));
+    var band = (W - L - R) / list.length;
+    var bw = Math.min(24, (band - 12) / 2); // nunca preenche a faixa: o resto é ar
+    var base = H - B;
+    var sy = function (v) { return base - (v / max) * (H - T - B); };
+    var s = "";
+    for (var g = 0; g <= 2; g++) {
+      var gv = (max / 2) * g, gy = sy(gv);
+      s += '<line class="grid" x1="' + L + '" x2="' + (W - R) + '" y1="' + gy + '" y2="' + gy + '"/>' +
+        '<text class="ax" x="' + (L - 6) + '" y="' + (gy + 4) + '" text-anchor="end">' + nf0.format(gv) + "</text>";
+    }
+    list.forEach(function (d, i) {
+      var cx = L + band * i + band / 2;
+      var x1 = cx - bw - 1, x2 = cx + 1; // 2 de ar entre as duas barras
+      if (d.pv != null) s += '<path class="bar" style="--c:var(--dd-solar)" d="' + barPath(x1, sy(d.pv), bw, base) + '"/>';
+      if (d.ld != null) s += '<path class="bar" style="--c:var(--dd-cons)" d="' + barPath(x2, sy(d.ld), bw, base) + '"/>';
+      var first = i === 0 || d.ym % 100 === 1;
+      // Faixas estreitas: um rótulo sim, outro não, sempre a contar do mês em curso.
+      var step = band < 40 ? 2 : 1;
+      var lbl = (list.length - 1 - i) % step === 0;
+      s += (lbl ? '<text class="ax' + (d.cur ? " cur" : "") + '" x="' + cx + '" y="' + (H - 10) + '" text-anchor="middle">' + monthLabel(d.ym, first) + "</text>" : "") +
+        '<rect class="hit" data-i="' + i + '" x="' + (L + band * i) + '" y="' + T + '" width="' + band + '" height="' + (base - T) + '" tabindex="0"' +
+        ' aria-label="' + monthLabel(d.ym, true) + ": produção " + kwhShort(d.pv) + ", consumo " + kwhShort(d.ld) + '"/>';
+    });
+    s += '<line class="base" x1="' + L + '" x2="' + (W - R) + '" y1="' + base + '" y2="' + base + '"/>';
+    ui.mchart.setAttribute("viewBox", "0 0 " + W + " " + H);
+    ui.mchart.setAttribute("aria-label", "Produção e consumo por mês, " + list.length + " meses");
+    ui.mchart.innerHTML = s;
+
+    var rows = "<thead><tr><th>Mês</th><th>Produção</th><th>Consumo</th></tr></thead><tbody>";
+    list.slice().reverse().forEach(function (d) {
+      rows += "<tr><td>" + monthLabel(d.ym, true) + (d.cur ? " (em curso)" : "") + "</td><td>" + kwhShort(d.pv) + "</td><td>" + kwhShort(d.ld) + "</td></tr>";
+    });
+    ui.mtable.innerHTML = rows + "</tbody>";
+  }
+  function monthTip(i) {
+    var d = monthsData[i];
+    if (!d) return hideMonthTip();
+    var tip = ui.mtip;
+    tip.innerHTML = "<b>" + monthLabel(d.ym, true) + (d.cur ? " · em curso" : "") + "</b>" +
+      '<span><span class="dd-key" style="--c:var(--dd-solar)"></span>Produção <b>' + kwhShort(d.pv) + "</b></span>" +
+      '<span><span class="dd-key" style="--c:var(--dd-cons)"></span>Consumo <b>' + kwhShort(d.ld) + "</b></span>";
+    tip.hidden = false;
+    var box = ui.mchart.getBoundingClientRect();
+    var n = monthsData.length;
+    var G = monthsGeom;
+    var cx = ((G.L + ((G.W - G.L - G.R) / n) * (i + 0.5)) / G.W) * box.width;
+    var left = Math.max(0, Math.min(box.width - tip.offsetWidth, cx - tip.offsetWidth / 2));
+    tip.style.left = left + "px";
+  }
+  function hideMonthTip() {
+    ui.mtip.hidden = true;
+  }
+  function setupMonths() {
+    var svg = ui.mchart;
+    var on = function (e) {
+      var i = e.target.getAttribute && e.target.getAttribute("data-i");
+      if (i != null) monthTip(+i);
+    };
+    svg.addEventListener("pointerover", on);
+    svg.addEventListener("focusin", on);
+    svg.addEventListener("pointerleave", hideMonthTip);
+    svg.addEventListener("focusout", hideMonthTip);
+    window.addEventListener("resize", function () {
+      clearTimeout(setupMonths.t);
+      setupMonths.t = setTimeout(renderMonths, 150);
+    });
+  }
+
   function batText(b) {
     if (b == null) return "Sem leitura";
     if (b <= -CFG.idleW) return "A carregar · " + powerTxt(-b);
@@ -477,6 +619,8 @@
     show("hToday", has("ePv"));
     set("hToday", kwh(val.ePv));
     set("hPeak", peak && peak.v >= idle ? powerTxt(peak.v) + " · " + clock(peak.t) : "—");
+
+    renderMonths();
 
     // Diagrama. O nó do gerador e o da saída LOAD seguem a app da Deye: só
     // aparecem quando há mesmo potência a passar por eles.

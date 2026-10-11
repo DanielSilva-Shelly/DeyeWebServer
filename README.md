@@ -97,6 +97,8 @@ O dashboard identifica as entidades pelo **nome** no YAML. Só as quatro primeir
 | `vBat` / `tBat` | Tensão / Temperatura da Bateria | 183 / 182 | ×0,01 V / (x−1000)×0,1 °C |
 | `iBat` | Corrente da Bateria | — | calculada (potência ÷ tensão), não gasta leituras no Modbus; serve para comparar com o limite do BMS |
 | `cap` | Capacidade da Bateria | — | constante do YAML (`battery_kwh`), usada para a autonomia; 0 desliga a estimativa |
+| — | Consumo Total | 85 (U_DWORD_R) | ×0,1 kWh; acumulado de consumo, base do histórico mensal. Confirma-o contra o total de consumo da app |
+| `pvMes` / `loadMes` / `hist` | Produção / Consumo Este Mês, Histórico Mensal | — | calculados no ESP, ver abaixo |
 | `tDc` / `tAc` | Temperatura DC / AC do Inversor | 90 / 91 | (x−1000)×0,1 °C |
 | `vPv1` / `vPv2` | Tensão PV1 / PV2 | 109 / 111 | ×0,1 V |
 
@@ -232,6 +234,15 @@ Com o inversor ligado, o mesmo log passa a mostrar o eco e a resposta na mesma l
 <<< 01:03:00:B8:00:01:04:2F:01:03:02:00:34:B9:93
     \_______ eco ________/\____ resposta ____/   SOC = 0x34 = 52 %
 ```
+
+### Histórico mensal
+
+O inversor só guarda totais do dia e acumulados desde sempre. O mês calcula-se no ESP: no início de cada mês guarda o acumulado de produção (registo 96) e de consumo (85), e o valor do mês é a diferença para o acumulado atual. Ao virar o mês, o anterior fecha num de 12 lugares (um por mês do ano) que ficam em flash, por isso sobrevivem a faltas de energia. O dashboard desenha os últimos 12 meses em barras, com tooltip e uma tabela.
+
+- **Precisa de relógio:** usa SNTP, portanto internet. Sem hora válida, não fecha meses.
+- **O primeiro mês é parcial:** conta a partir do dia em que gravaste o firmware. Não há forma de recuperar meses anteriores a partir do inversor.
+- **ESP desligado:** não se perde energia, porque os acumulados vêm do inversor. Só se estiver desligado na passagem do mês é que esses dias ficam no mês em que voltar a ligar.
+- **Flash:** no ESP8266 é preciso `restore_from_flash: true` (já está nos YAML). A flash só é escrita quando um valor muda, ou seja, uma vez por mês.
 
 ### Autonomia da bateria
 

@@ -25,6 +25,10 @@ esphome:
 
 esp8266:
   board: esp12e
+  # O histórico mensal (globals com restore_value) tem de sobreviver a uma falta
+  # de energia. No ESP8266, sem isto, só sobrevive a reinícios por software.
+  # A flash só é escrita quando um valor muda: aqui, uma vez por mês.
+  restore_from_flash: true
 
 # baud_rate 0 liberta a UART0 para o Modbus; os logs continuam disponíveis pelo WiFi.
 # INFO mostra os avisos do Modbus (sem resposta, CRC). Para mais detalhe, usa DEBUG temporariamente.
@@ -81,6 +85,84 @@ web_server:
     - id: sistema
       name: Sistema
       sorting_weight: 5
+
+# Relógio por NTP: só serve para saber quando muda o mês.
+time:
+  - platform: sntp
+    id: relogio
+    timezone: Europe/Lisbon
+
+# ---------- Histórico mensal ----------
+# O inversor só guarda totais diários e acumulados; o mês calcula-se aqui. No
+# início de cada mês guarda-se o acumulado de produção e de consumo, e o valor do
+# mês é a diferença para o acumulado atual. Ao virar o mês, o anterior fecha num
+# de 12 lugares, um por mês do ano, que ficam em flash.
+#
+# Como os acumulados vêm do inversor, um ESP desligado uns dias não perde
+# energia. Só se estiver desligado na passagem do mês é que a energia desses dias
+# fica no mês em que voltar a ligar.
+globals:
+  - id: mes_ref # AAAAMM do mês em curso; 0 = ainda não começou a contar
+    type: int
+    restore_value: true
+    initial_value: "0"
+  - id: base_pv # acumulado de produção no início do mês, kWh
+    type: float
+    restore_value: true
+    initial_value: "0"
+  - id: base_load # acumulado de consumo no início do mês, kWh
+    type: float
+    restore_value: true
+    initial_value: "0"
+  - id: hist_ym # AAAAMM de cada lugar; 0 = vazio
+    type: std::array<int, 12>
+    restore_value: true
+  - id: hist_pv
+    type: std::array<float, 12>
+    restore_value: true
+  - id: hist_load
+    type: std::array<float, 12>
+    restore_value: true
+
+interval:
+  - interval: 60s
+    then:
+      - lambda: |-
+          auto t = id(relogio).now();
+          float pv = id(pv_total).state;
+          float ld = id(load_total).state;
+          if (!t.is_valid() || std::isnan(pv) || std::isnan(ld)) return;
+          int ym = t.year * 100 + t.month;
+          if (id(mes_ref) == 0) {
+            // Primeiro arranque: o mês começa a contar a partir de agora.
+            id(mes_ref) = ym;
+            id(base_pv) = pv;
+            id(base_load) = ld;
+          } else if (ym != id(mes_ref)) {
+            // Virou o mês: fecha o anterior no lugar do seu mês do ano.
+            int slot = id(mes_ref) % 100 - 1;
+            if (slot >= 0 && slot < 12) {
+              id(hist_ym)[slot] = id(mes_ref);
+              id(hist_pv)[slot] = std::max(0.0f, pv - id(base_pv));
+              id(hist_load)[slot] = std::max(0.0f, ld - id(base_load));
+            }
+            id(mes_ref) = ym;
+            id(base_pv) = pv;
+            id(base_load) = ld;
+          }
+          // Contadores do inversor abaixo da base (troca ou reset): recomeça.
+          if (pv < id(base_pv)) id(base_pv) = pv;
+          if (ld < id(base_load)) id(base_load) = ld;
+          id(pv_mes).publish_state(pv - id(base_pv));
+          id(load_mes).publish_state(ld - id(base_load));
+          std::string s = std::to_string(id(mes_ref)) + ";";
+          char b[40];
+          for (int i = 0; i < 12; i++) {
+            if (id(hist_ym)[i] == 0) continue;
+            snprintf(b, sizeof(b), "%d:%.1f:%.1f,", id(hist_ym)[i], id(hist_pv)[i], id(hist_load)[i]);
+            s += b;
+          }
+          if (s != id(historico).state) id(historico).publish_state(s);
 
 uart:
   id: uart_bus
@@ -253,6 +335,7 @@ sensor:
   # Total acumulado (32 bits, palavra baixa primeiro): útil para o painel de Energia do Home Assistant
   - platform: modbus_controller
     modbus_controller_id: deye_lento
+    id: pv_total
     name: "Produção Solar Total"
     register_type: holding
     address: 96
@@ -264,6 +347,46 @@ sensor:
     filters:
       - multiply: 0.1
     web_server: { sorting_group_id: solar, sorting_weight: 4 }
+
+  # Consumo acumulado (32 bits, palavra baixa primeiro). É com ele e com a
+  # produção total que se calcula o histórico mensal.
+  - platform: modbus_controller
+    modbus_controller_id: deye_lento
+    id: load_total
+    name: "Consumo Total"
+    register_type: holding
+    address: 85
+    value_type: U_DWORD_R
+    unit_of_measurement: kWh
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+    web_server: { sorting_group_id: casa, sorting_weight: 5 }
+
+  # Mês em curso, calculado no interval do histórico mensal (mais abaixo).
+  - platform: template
+    id: pv_mes
+    name: "Produção Este Mês"
+    icon: mdi:calendar-month
+    unit_of_measurement: kWh
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    update_interval: never
+    web_server: { sorting_group_id: solar, sorting_weight: 7 }
+
+  - platform: template
+    id: load_mes
+    name: "Consumo Este Mês"
+    icon: mdi:calendar-month
+    unit_of_measurement: kWh
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    update_interval: never
+    web_server: { sorting_group_id: casa, sorting_weight: 6 }
 
   # ---------- Rede, bateria e inversor (60 s) ----------
   - <<: *slow
@@ -425,6 +548,17 @@ sensor:
     web_server: { sorting_group_id: sistema, sorting_weight: 11 }
 
 text_sensor:
+  # Meses fechados, para o gráfico do dashboard. Formato:
+  #   "AAAAMM;AAAAMM:produção:consumo,AAAAMM:produção:consumo,..."
+  # O primeiro AAAAMM é o mês em curso; os seguintes são os meses fechados (kWh).
+  - platform: template
+    id: historico
+    name: "Histórico Mensal"
+    icon: mdi:chart-bar
+    entity_category: diagnostic
+    update_interval: never
+    web_server: { sorting_group_id: sistema, sorting_weight: 30 }
+
   - platform: template
     id: estado_inversor
     name: "Estado do Inversor"
