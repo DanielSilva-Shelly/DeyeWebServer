@@ -23,6 +23,9 @@ substitutions:
   friendly_name: Deye Inverter
   # Versão do dashboard servida pelo jsDelivr: "main" ou uma tag (ex.: v1.0.0, recomendado)
   dash_version: v1.0.1
+  # Capacidade total do banco de baterias, em kWh (aqui 2 × 16 kWh). O dashboard
+  # usa-a para estimar a autonomia; põe 0 para desligar essa estimativa.
+  battery_kwh: "32"
 
   # ---- PREENCHE ISTO ANTES DE GRAVAR ----
   # Chave da API (igual à do Home Assistant, senão tens de a atualizar lá).
@@ -419,6 +422,18 @@ sensor:
       // dividir por ela daria um valor absurdo no arranque.
       if (std::isnan(w) || std::isnan(v) || v < 10.0f) return NAN;
       return w / v;
+
+  # Capacidade do banco de baterias, publicada como sensor para o dashboard a
+  # ler pelo mesmo canal que os outros valores. Não toca no Modbus.
+  - platform: template
+    name: "Capacidade da Bateria"
+    icon: mdi:battery-high
+    unit_of_measurement: kWh
+    entity_category: diagnostic
+    accuracy_decimals: 1
+    update_interval: 60s
+    lambda: return ${battery_kwh};
+    web_server: { sorting_group_id: bateria, sorting_weight: 9 }
 
   # ---------- Diagnóstico do ESP ----------
   - platform: wifi_signal

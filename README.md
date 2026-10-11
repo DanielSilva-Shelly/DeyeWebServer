@@ -96,6 +96,7 @@ O dashboard identifica as entidades pelo **nome** no YAML. Só as quatro primeir
 | `vGrid` / `fGrid` | Tensão / Frequência da Rede | 150 / 79 | ×0,1 V / ×0,01 Hz |
 | `vBat` / `tBat` | Tensão / Temperatura da Bateria | 183 / 182 | ×0,01 V / (x−1000)×0,1 °C |
 | `iBat` | Corrente da Bateria | — | calculada (potência ÷ tensão), não gasta leituras no Modbus; serve para comparar com o limite do BMS |
+| `cap` | Capacidade da Bateria | — | constante do YAML (`battery_kwh`), usada para a autonomia; 0 desliga a estimativa |
 | `tDc` / `tAc` | Temperatura DC / AC do Inversor | 90 / 91 | (x−1000)×0,1 °C |
 | `vPv1` / `vPv2` | Tensão PV1 / PV2 | 109 / 111 | ×0,1 V |
 
@@ -231,6 +232,12 @@ Com o inversor ligado, o mesmo log passa a mostrar o eco e a resposta na mesma l
 <<< 01:03:00:B8:00:01:04:2F:01:03:02:00:34:B9:93
     \_______ eco ________/\____ resposta ____/   SOC = 0x34 = 52 %
 ```
+
+### Autonomia da bateria
+
+O cartão da bateria mostra quanto tempo falta: até à reserva quando descarrega (`≈ 6 h 20 min até 20 %`) e até cheia quando carrega (`cheia em ≈ 2 h 10 min`). A conta usa o SOC, a capacidade em `battery_kwh` e a potência da bateria **em média móvel de 5 minutos** — sem a média, um compressor a arrancar fazia a estimativa saltar horas. A média recomeça quando a bateria muda de sentido.
+
+A reserva é o `lowSocPct` (20 %). Se o teu inversor corta a descarga noutro valor, ajusta `reserveSocPct` em `window.DEYE_DASH`. É uma estimativa linear: não conta com a perda de capacidade com o frio nem com o consumo mudar ao longo da noite.
 
 ### Nós que aparecem e desaparecem
 

@@ -22,6 +22,12 @@
       gridPositiveIsImport: true, // Deye: + compra à rede, − venda
       idleW: 20, // abaixo disto conta como parado
       lowSocPct: 20,
+      // Autonomia: SOC até onde a descarga conta (por omissão, o lowSocPct) e a
+      // constante de tempo da média da potência da bateria. Sem média, um
+      // compressor a arrancar fazia a estimativa saltar horas de um lado para o outro.
+      reserveSocPct: null,
+      autonomyTauS: 300,
+      batteryKwh: null, // sobrepõe-se ao sensor "Capacidade da Bateria"
       historyPoints: 360,
       loadEsphomeUi: true,
       esphomeUiUrl: "https://oi.esphome.io/v3/www.js",
@@ -52,6 +58,7 @@
       fGrid: "Frequência da Rede",
       vBat: "Tensão da Bateria",
       iBat: "Corrente da Bateria",
+      cap: "Capacidade da Bateria",
       tBat: "Temperatura da Bateria",
       tDc: "Temperatura DC do Inversor",
       tAc: "Temperatura AC do Inversor",
@@ -395,6 +402,48 @@
     var g = ui.links[lb];
     if (g) g.style.display = open ? "" : "none";
   }
+  // ---------- Autonomia da bateria -----------------------------------------
+  var emaB = null;
+  var emaT = 0;
+  function batAvg(b) {
+    var now = Date.now();
+    // Recomeça a média quando muda o sentido (carga ↔ descarga): misturar os
+    // dois dava uma estimativa sem sentido durante minutos.
+    if (b == null || emaB == null || (b >= 0) !== (emaB >= 0)) {
+      emaB = b;
+    } else {
+      var dt = Math.max(0, (now - emaT) / 1000);
+      emaB += (1 - Math.exp(-dt / CFG.autonomyTauS)) * (b - emaB);
+    }
+    emaT = now;
+    return emaB;
+  }
+  function capKwh() {
+    var c = CFG.batteryKwh != null ? CFG.batteryKwh : val.cap;
+    return c > 0 ? c : null;
+  }
+  function duration(h) {
+    if (h > 48) return "mais de 2 dias";
+    var m = Math.round(h * 60);
+    if (m < 60) return m + " min";
+    return Math.floor(m / 60) + " h" + (m % 60 ? " " + (m % 60) + " min" : "");
+  }
+  // Texto curto com o tempo até à reserva (a descarregar) ou até cheia (a
+  // carregar), ou null quando não há dados ou a bateria está parada.
+  function autonomy(bAvg) {
+    var c = capKwh();
+    if (c == null || bAvg == null || !has("soc") || Math.abs(bAvg) < CFG.idleW) return null;
+    var reserve = CFG.reserveSocPct != null ? CFG.reserveSocPct : CFG.lowSocPct;
+    if (bAvg > 0) {
+      var left = ((val.soc - reserve) / 100) * c * 1000;
+      if (left <= 0) return null;
+      return "≈ " + duration(left / bAvg) + " até " + nf0.format(reserve) + " %";
+    }
+    var toFull = ((100 - val.soc) / 100) * c * 1000;
+    if (toFull <= 0) return null;
+    return "cheia em ≈ " + duration(toFull / -bAvg);
+  }
+
   function batText(b) {
     if (b == null) return "Sem leitura";
     if (b <= -CFG.idleW) return "A carregar · " + powerTxt(-b);
@@ -470,6 +519,8 @@
     var low = has("soc") && val.soc < CFG.lowSocPct;
     ui.tiles.soc.classList.toggle("is-low", low);
     var bs = batText(b);
+    var au = autonomy(batAvg(b));
+    if (au) bs += " · " + au;
     var html = low ? icon(ICON.alert, "dd-alert") + "<span>Baixa · " + bs + "</span>" : "<span>" + bs + "</span>";
     if (ui["soc.st"].innerHTML !== html) ui["soc.st"].innerHTML = html;
 
