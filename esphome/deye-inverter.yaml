@@ -27,7 +27,7 @@ esp32:
 
 # O Modbus usa a UART2 (GPIO16/17): a UART0/USB fica livre para logs.
 logger:
-  level: INFO
+  level: WARN # só avisos; INFO ou DEBUG para diagnóstico
 
 api:
   encryption:
@@ -91,9 +91,10 @@ time:
 # mês é a diferença para o acumulado atual. Ao virar o mês, o anterior fecha num
 # de 12 lugares, um por mês do ano, que ficam em flash.
 #
-# Como os acumulados vêm do inversor, um ESP desligado uns dias não perde
-# energia. Só se estiver desligado na passagem do mês é que a energia desses dias
-# fica no mês em que voltar a ligar.
+# Como os acumulados vêm do inversor, um ESP desligado não perde energia. Se
+# estiver desligado na passagem do mês, ao voltar desconta o "hoje" do inversor
+# (registos 108 e 84), que já é do mês novo. Só os dias inteiros em falta, entre
+# o dia 1 e o dia em que voltar, ficam no mês anterior.
 globals:
   - id: mes_ref # AAAAMM do mês em curso; 0 = ainda não começou a contar
     type: int
@@ -132,16 +133,22 @@ interval:
             id(base_pv) = pv;
             id(base_load) = ld;
           } else if (ym != id(mes_ref)) {
-            // Virou o mês: fecha o anterior no lugar do seu mês do ano.
+            // Virou o mês: fecha o anterior no lugar do seu mês do ano. O que o
+            // inversor já marca como "hoje" pertence ao mês novo: se o ESP esteve
+            // desligado à meia-noite, sem isto essas horas iam para o mês velho.
+            float pv_d = std::isnan(id(pv_hoje).state) ? 0.0f : id(pv_hoje).state;
+            float ld_d = std::isnan(id(load_hoje).state) ? 0.0f : id(load_hoje).state;
+            pv_d = std::min(pv_d, pv - id(base_pv));
+            ld_d = std::min(ld_d, ld - id(base_load));
             int slot = id(mes_ref) % 100 - 1;
             if (slot >= 0 && slot < 12) {
               id(hist_ym)[slot] = id(mes_ref);
-              id(hist_pv)[slot] = std::max(0.0f, pv - id(base_pv));
-              id(hist_load)[slot] = std::max(0.0f, ld - id(base_load));
+              id(hist_pv)[slot] = std::max(0.0f, pv - pv_d - id(base_pv));
+              id(hist_load)[slot] = std::max(0.0f, ld - ld_d - id(base_load));
             }
             id(mes_ref) = ym;
-            id(base_pv) = pv;
-            id(base_load) = ld;
+            id(base_pv) = pv - std::max(0.0f, pv_d);
+            id(base_load) = ld - std::max(0.0f, ld_d);
           }
           // Contadores do inversor abaixo da base (troca ou reset): recomeça.
           if (pv < id(base_pv)) id(base_pv) = pv;
@@ -296,6 +303,7 @@ sensor:
 
   # ---------- Energia de hoje (60 s; o inversor faz reset à meia-noite) ----------
   - <<: *energy
+    id: pv_hoje
     name: "Produção Solar Hoje"
     address: 108
     web_server: { sorting_group_id: solar, sorting_weight: 3 }
@@ -321,6 +329,7 @@ sensor:
     web_server: { sorting_group_id: rede, sorting_weight: 3 }
 
   - <<: *energy
+    id: load_hoje
     name: "Consumo Hoje"
     address: 84
     web_server: { sorting_group_id: casa, sorting_weight: 2 }
