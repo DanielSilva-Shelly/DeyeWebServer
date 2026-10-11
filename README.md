@@ -241,7 +241,7 @@ O inversor só guarda totais do dia e acumulados desde sempre. O mês calcula-se
 
 - **Precisa de relógio:** usa SNTP, portanto internet. Sem hora válida, não fecha meses.
 - **O primeiro mês é parcial:** conta a partir do dia em que gravaste o firmware. Não há forma de recuperar meses anteriores a partir do inversor.
-- **ESP desligado:** não se perde energia, porque os acumulados vêm do inversor. Só se estiver desligado na passagem do mês é que esses dias ficam no mês em que voltar a ligar.
+- **ESP desligado:** não se perde energia, porque os acumulados vêm do inversor. Se estiver desligado na passagem do mês, ao voltar desconta o "hoje" do inversor (registos 108 e 84), que já pertence ao mês novo. Só dias inteiros em falta, entre o dia 1 e o dia em que voltar, ficam no mês anterior.
 - **Flash:** no ESP8266 é preciso `restore_from_flash: true` (já está nos YAML). A flash só é escrita quando um valor muda, ou seja, uma vez por mês.
 
 ### Autonomia da bateria
