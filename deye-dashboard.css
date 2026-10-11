@@ -31,6 +31,9 @@
      dourado separam-se bem dos quatro tons acima, incluindo em daltonismo. */
   --dd-ups: light-dark(#7d4fc9, #9b76e2);
   --dd-gen: light-dark(#9a6b06, #c99418);
+  /* Consumo no gráfico mensal: o cinzento da Casa lê-se como "desativado" numa
+     série. Violeta contra o laranja da produção passa o validador nos dois temas. */
+  --dd-cons: light-dark(#6250d6, #9085e9);
 
   /* Estado (reservado: nunca usado como cor de série) */
   --dd-good: #0ca30c;
@@ -56,6 +59,7 @@
     --dd-grid: #2a78d6;
     --dd-ups: #7d4fc9;
     --dd-gen: #9a6b06;
+    --dd-cons: #6250d6;
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -71,6 +75,7 @@
       --dd-grid: #3987e5;
       --dd-ups: #9b76e2;
       --dd-gen: #c99418;
+      --dd-cons: #9085e9;
     }
   }
 }
@@ -558,4 +563,110 @@ body.dd-esp-open esp-app {
   .dd-meter > span {
     transition: none;
   }
+}
+
+/* ---------- Por mês ----------------------------------------------------- */
+.dd-months {
+  margin-top: 12px;
+}
+.dd-months-h {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px 16px;
+}
+.dd-legend {
+  display: flex;
+  gap: 16px;
+  color: var(--dd-ink-2);
+  font-size: 13px;
+}
+.dd-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.dd-mchart {
+  position: relative;
+}
+.dd-mchart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.dd-mchart .grid {
+  stroke: var(--dd-hair);
+  stroke-width: 1;
+}
+.dd-mchart .base {
+  stroke: var(--dd-axis);
+  stroke-width: 1;
+}
+.dd-mchart .ax {
+  fill: var(--dd-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.dd-mchart .ax.cur {
+  fill: var(--dd-ink);
+  font-weight: 600;
+}
+.dd-mchart .bar {
+  fill: var(--c);
+}
+.dd-mchart .hit {
+  fill: transparent;
+  outline: none;
+}
+.dd-mchart .hit:hover,
+.dd-mchart .hit:focus-visible {
+  fill: color-mix(in srgb, var(--dd-ink) 5%, transparent);
+}
+.dd-mtip {
+  position: absolute;
+  top: 0;
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--dd-border);
+  border-radius: 8px;
+  background: var(--dd-surface);
+  color: var(--dd-ink-2);
+  font-size: 12px;
+  pointer-events: none;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+.dd-mtip b {
+  color: var(--dd-ink);
+}
+.dd-mtip > span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.dd-mtable {
+  margin-top: 8px;
+  color: var(--dd-ink-2);
+  font-size: 13px;
+}
+.dd-mtable summary {
+  cursor: pointer;
+}
+.dd-mtable table {
+  width: 100%;
+  margin-top: 8px;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.dd-mtable th,
+.dd-mtable td {
+  padding: 4px 0;
+  border-bottom: 1px solid var(--dd-hair);
+  text-align: right;
+}
+.dd-mtable th:first-child,
+.dd-mtable td:first-child {
+  text-align: left;
 }
