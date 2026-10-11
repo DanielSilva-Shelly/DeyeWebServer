@@ -268,7 +268,7 @@
         "</svg></section></div>" +
         '<div class="dd-tiles">' +
         tile("pv", "Solar", "var(--dd-solar)", ICON.solar) +
-        tile("soc", "Bateria", "var(--dd-bat)", ICON.bat, '<div class="dd-meter" aria-hidden="true"><span data-f="meter"></span></div>') +
+        tile("soc", "Bateria", "var(--dd-bat)", ICON.bat, '<p class="dd-st" data-f="au" hidden></p><div class="dd-meter" aria-hidden="true"><span data-f="meter"></span></div>') +
         tile("grid", "Rede", "var(--dd-grid)", ICON.grid) +
         tile("load", "Casa", "var(--dd-home)", ICON.home) +
         "</div>" +
@@ -434,14 +434,17 @@
     var c = capKwh();
     if (c == null || bAvg == null || !has("soc") || Math.abs(bAvg) < CFG.idleW) return null;
     var reserve = CFG.reserveSocPct != null ? CFG.reserveSocPct : CFG.lowSocPct;
+    // A corrente que entra na conta: a mesma média de 5 minutos da potência,
+    // passada a amperes pela tensão atual. É o número que se compara com o BMS.
+    var amps = has("vBat") && val.vBat > 10 ? " a " + nf1.format(Math.abs(bAvg) / val.vBat) + " A" : "";
     if (bAvg > 0) {
       var left = ((val.soc - reserve) / 100) * c * 1000;
       if (left <= 0) return null;
-      return "≈ " + duration(left / bAvg) + " até " + nf0.format(reserve) + " %";
+      return "≈ " + duration(left / bAvg) + " até " + nf0.format(reserve) + " %" + amps;
     }
     var toFull = ((100 - val.soc) / 100) * c * 1000;
     if (toFull <= 0) return null;
-    return "cheia em ≈ " + duration(toFull / -bAvg);
+    return "cheia em ≈ " + duration(toFull / -bAvg) + amps;
   }
 
   function batText(b) {
@@ -519,8 +522,10 @@
     var low = has("soc") && val.soc < CFG.lowSocPct;
     ui.tiles.soc.classList.toggle("is-low", low);
     var bs = batText(b);
+    // A estimativa vai numa linha própria: colada ao estado, partia a meio.
     var au = autonomy(batAvg(b));
-    if (au) bs += " · " + au;
+    set("soc.au", au || "");
+    if (ui["soc.au"].hidden === !!au) ui["soc.au"].hidden = !au;
     var html = low ? icon(ICON.alert, "dd-alert") + "<span>Baixa · " + bs + "</span>" : "<span>" + bs + "</span>";
     if (ui["soc.st"].innerHTML !== html) ui["soc.st"].innerHTML = html;
 

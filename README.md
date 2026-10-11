@@ -235,7 +235,7 @@ Com o inversor ligado, o mesmo log passa a mostrar o eco e a resposta na mesma l
 
 ### Autonomia da bateria
 
-O cartão da bateria mostra quanto tempo falta: até à reserva quando descarrega (`≈ 6 h 20 min até 20 %`) e até cheia quando carrega (`cheia em ≈ 2 h 10 min`). A conta usa o SOC, a capacidade em `battery_kwh` e a potência da bateria **em média móvel de 5 minutos** — sem a média, um compressor a arrancar fazia a estimativa saltar horas. A média recomeça quando a bateria muda de sentido.
+O cartão da bateria mostra, numa linha própria, quanto tempo falta e a que corrente: até à reserva quando descarrega (`≈ 17 h 50 min até 20 % a 13,0 A`) e até cheia quando carrega (`cheia em ≈ 4 h 1 min a 71,2 A`). A corrente é a mesma média que entra na conta, passada a amperes pela tensão da bateria. A conta usa o SOC, a capacidade em `battery_kwh` e a potência da bateria **em média móvel de 5 minutos** — sem a média, um compressor a arrancar fazia a estimativa saltar horas. A média recomeça quando a bateria muda de sentido.
 
 A reserva é o `lowSocPct` (20 %). Se o teu inversor corta a descarga noutro valor, ajusta `reserveSocPct` em `window.DEYE_DASH`. É uma estimativa linear: não conta com a perda de capacidade com o frio nem com o consumo mudar ao longo da noite.
 
